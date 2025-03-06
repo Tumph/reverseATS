@@ -1,37 +1,73 @@
-// Function to count and display the number of <tr> elements
-function countAndDisplayTrElements(): void {
-  // Get all tr elements on the page
-  const trElements: HTMLCollectionOf<HTMLTableRowElement> = document.getElementsByTagName('tr');
-  const trCount: number = trElements.length;
+// Function to add TR counter and scrape button above WaterlooWorks tables
+function addTrCounterAndButton(): void {
+  // Find all tables on the page
+  const tables = document.getElementsByTagName('table');
   
-  // Create a div to display the count
-  const countDisplay: HTMLDivElement = document.createElement('div');
-  countDisplay.id = 'tr-counter';
-  countDisplay.style.position = 'fixed';
-  countDisplay.style.top = '10px';
-  countDisplay.style.right = '10px';
-  countDisplay.style.backgroundColor = '#4285f4';
-  countDisplay.style.color = 'white';
-  countDisplay.style.padding = '10px';
-  countDisplay.style.borderRadius = '5px';
-  countDisplay.style.zIndex = '9999';
-  countDisplay.style.fontWeight = 'bold';
-  countDisplay.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
-  countDisplay.textContent = `Table Rows: ${trCount}`;
-  
-  // Add the div to the page
-  document.body.appendChild(countDisplay);
-  
-  console.log(`WaterlooWorks TR Counter: Found ${trCount} <tr> elements`);
+  // Process each table
+  for (let i = 0; i < tables.length; i++) {
+    const table = tables[i];
+    
+    // Skip if we've already added a counter to this table
+    if (table.getAttribute('data-tr-counter-added') === 'true') {
+      continue;
+    }
+    
+    // Create container for the counter and button
+    const container = document.createElement('div');
+    container.className = 'tr-counter-container';
+    container.style.margin = '10px 0';
+    container.style.padding = '10px';
+    container.style.backgroundColor = '#f5f5f5';
+    container.style.borderRadius = '5px';
+    container.style.display = 'flex';
+    container.style.alignItems = 'center';
+    container.style.gap = '10px';
+    
+    // Create TR count display
+    const trCountDisplay = document.createElement('div');
+    trCountDisplay.className = 'tr-count-display';
+    trCountDisplay.textContent = 'TR Count: ';
+    trCountDisplay.style.fontWeight = 'bold';
+    
+    // Create scrape button
+    const scrapeButton = document.createElement('button');
+    scrapeButton.textContent = 'Scrape';
+    scrapeButton.style.padding = '5px 10px';
+    scrapeButton.style.backgroundColor = '#4285f4';
+    scrapeButton.style.color = 'white';
+    scrapeButton.style.border = 'none';
+    scrapeButton.style.borderRadius = '3px';
+    scrapeButton.style.cursor = 'pointer';
+    
+    // Add click event to the button
+    scrapeButton.addEventListener('click', () => {
+      const trElements = table.getElementsByTagName('tr');
+      trCountDisplay.textContent = `TR Count: ${trElements.length}`;
+    });
+    
+    // Add elements to container
+    container.appendChild(trCountDisplay);
+    container.appendChild(scrapeButton);
+    
+    // Insert container before the table
+    table.parentNode?.insertBefore(container, table);
+    
+    // Mark this table as processed
+    table.setAttribute('data-tr-counter-added', 'true');
+  }
 }
 
 // Run the function when the page is fully loaded
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(countAndDisplayTrElements, 1000); // Delay to ensure page is fully loaded
+    setTimeout(() => {
+      addTrCounterAndButton();
+    }, 1000); // Delay to ensure page is fully loaded
   });
 } else {
-  setTimeout(countAndDisplayTrElements, 1000); // Delay to ensure page is fully loaded
+  setTimeout(() => {
+    addTrCounterAndButton();
+  }, 1000); // Delay to ensure page is fully loaded
 }
 
 // Create a debounced version of the update function to prevent too many updates
@@ -45,14 +81,8 @@ function debouncedUpdate(): void {
     // Temporarily disconnect the observer to prevent infinite loops
     observer.disconnect();
     
-    // Remove existing counter if it exists
-    const existingCounter: HTMLElement | null = document.getElementById('tr-counter');
-    if (existingCounter) {
-      existingCounter.remove();
-    }
-    
-    // Recount and display
-    countAndDisplayTrElements();
+    // Reapply TR counters to any new tables
+    addTrCounterAndButton();
     
     // Reconnect the observer
     observer.observe(document.body, { 

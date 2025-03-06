@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "es2017",
+    "module": "es2015",
+    "strict": true,
+    "esModuleInterop": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "sourceMap": true,
+    "typeRoots": ["./node_modules/@types"],
+    "lib": ["dom", "es2017"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+} 

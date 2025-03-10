@@ -13,5 +13,10 @@
       "js": ["content.js"]
     }
   ],
-  "permissions": ["activeTab"]
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "*://waterlooworks.uwaterloo.ca/*"
+  ]
 } 

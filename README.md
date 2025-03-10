@@ -1,12 +1,16 @@
 # WaterlooWorks TR Counter
 
-A Chrome extension that counts and displays the number of table rows (`<tr>` elements) on the WaterlooWorks job page.
+A Chrome extension that counts and displays the number of table rows (`<tr>` elements) on the WaterlooWorks job page and provides additional functionality for working with job listings.
 
 ## Features
 
-- Displays a counter in the top-right corner of the page showing the number of table rows
+- Counts and displays the number of table rows (jobs) on the page
+- Extracts and displays job IDs from the table
+- Scrapes detailed information about each job
+- Allows downloading job details as JSON or CSV
+- Includes an "About" button with information about the extension
 - Updates automatically when the page content changes
-- Works on all WaterlooWorks pages
+- Works with the latest WaterlooWorks UI
 
 ## Development
 
@@ -49,7 +53,7 @@ To watch for changes and rebuild automatically:
 npm run watch
 ```
 
-## Installation
+### Installation
 
 1. Build the extension using the instructions above
 2. Open Chrome and navigate to `chrome://extensions/`
@@ -59,7 +63,32 @@ npm run watch
 
 ## How It Works
 
-The extension counts all `<tr>` elements on the page and displays the count in a fixed position in the top-right corner. It uses a MutationObserver to detect changes to the DOM and update the count accordingly.
+The extension adds a control panel above job listing tables on WaterlooWorks. The panel includes:
+
+1. **TR Count Display**: Shows the number of table rows (jobs) on the page
+2. **Scrape Button**: Counts rows and extracts job IDs
+3. **Scrape Job Details Button**: Extracts detailed information about each job
+4. **About Button**: Shows information about the extension
+5. **Job IDs Display**: Shows the extracted job IDs
+6. **Job Details Display**: Shows the extracted job details with options to download as JSON or CSV
+
+The extension uses a MutationObserver to detect changes to the DOM and update the controls accordingly.
+
+## Data Extraction
+
+The extension extracts the following information from job listings:
+
+- Job ID
+- Job Title
+- Organization
+- Location/City
+- Term
+- Openings
+- Status
+- Level
+- Application Deadline
+
+All data is extracted directly from the page without making additional network requests.
 
 ## License
 

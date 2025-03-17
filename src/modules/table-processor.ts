@@ -9,11 +9,13 @@ import {
   createJobDetailsDisplay,
   createLoadingIndicator,
   createDescriptionButton,
+  createFetchOverviewsButton,
   processTable,
-  renderJobDetails
+  renderJobDetails,
+  renderJobOverviews
 } from './dom-utils';
 
-import { scrapeAllJobDetails } from './scraper';
+import { scrapeAllJobDetails, fetchAllJobOverviews } from './scraper';
 import { JobDetails } from './types';
 
 /**
@@ -56,6 +58,9 @@ export function addTrCounterAndButton(): void {
     
     // Create scrape job details button
     const scrapeJobDetailsButton = createScrapeJobDetailsButton();
+    
+    // Create fetch job overviews button
+    const fetchOverviewsButton = createFetchOverviewsButton();
     
     // Create description button
     const descriptionButton = createDescriptionButton();
@@ -113,10 +118,43 @@ export function addTrCounterAndButton(): void {
       }
     });
     
+    // Add click event to the fetch job overviews button
+    fetchOverviewsButton.addEventListener('click', async () => {
+      try {
+        // Show loading indicator
+        loadingIndicator.style.display = 'block';
+        jobDetailsDisplay.style.display = 'none';
+        
+        // Fetch all job overviews
+        const jobOverviews = await fetchAllJobOverviews();
+        
+        // Hide loading indicator
+        loadingIndicator.style.display = 'none';
+        
+        // Render job overviews
+        renderJobOverviews(jobDetailsDisplay, jobOverviews);
+        
+        // Save job overviews to chrome.storage.local
+        chrome.storage.local.set({ jobOverviews: jobOverviews }, () => {
+          console.log('Job overviews saved to chrome.storage.local');
+        });
+      } catch (error: unknown) {
+        console.error('Error fetching job overviews:', error);
+        
+        // Hide loading indicator
+        loadingIndicator.style.display = 'none';
+        
+        // Show error message
+        jobDetailsDisplay.style.display = 'block';
+        jobDetailsDisplay.innerHTML = `<p style="color: red;">Error fetching job overviews: ${error instanceof Error ? error.message : String(error)}</p>`;
+      }
+    });
+    
     // Add elements to container
     container.appendChild(trCountDisplay);
     container.appendChild(scrapeButton);
     container.appendChild(scrapeJobDetailsButton);
+    container.appendChild(fetchOverviewsButton);
     container.appendChild(descriptionButton);
     container.appendChild(jobIdsDisplay);
     container.appendChild(loadingIndicator);

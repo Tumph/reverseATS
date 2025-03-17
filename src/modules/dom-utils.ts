@@ -197,6 +197,24 @@ export function createScrapeJobDetailsButton(): HTMLButtonElement {
 }
 
 /**
+ * Creates a fetch job overviews button element
+ * @returns The created fetch job overviews button element
+ */
+export function createFetchOverviewsButton(): HTMLButtonElement {
+  const fetchOverviewsButton = document.createElement('button');
+  fetchOverviewsButton.textContent = 'Fetch Job Overviews';
+  fetchOverviewsButton.style.padding = '5px 10px';
+  fetchOverviewsButton.style.backgroundColor = '#fbbc05';
+  fetchOverviewsButton.style.color = 'white';
+  fetchOverviewsButton.style.border = 'none';
+  fetchOverviewsButton.style.borderRadius = '3px';
+  fetchOverviewsButton.style.cursor = 'pointer';
+  fetchOverviewsButton.style.marginLeft = '10px';
+  
+  return fetchOverviewsButton;
+}
+
+/**
  * Creates a job details display element
  * @ returns The created job details display element
  */
@@ -482,4 +500,149 @@ export function renderJobDetails(jobDetailsDisplay: HTMLDivElement, jobDetails: 
   // Show the job details
   jobDetailsDisplay.style.display = 'block';
   jobDetailsDisplay.appendChild(detailsContainer);
+}
+
+/**
+ * Renders job overviews in the provided container
+ * @param {HTMLDivElement} container - The container to render overviews in
+ * @param {Array<{jobId: string, overview: Record<string, string>}>} overviews - Array of job overviews
+ */
+export function renderJobOverviews(container: HTMLDivElement, overviews: Array<{jobId: string, overview: Record<string, string>}>): void {
+  // Clear container
+  container.innerHTML = '';
+  container.style.display = 'block';
+  
+  // Create header
+  const header = document.createElement('h2');
+  header.textContent = `Job Overviews (${overviews.length})`;
+  header.style.marginTop = '20px';
+  header.style.marginBottom = '10px';
+  container.appendChild(header);
+  
+  // Create export buttons
+  const exportButtonsContainer = document.createElement('div');
+  exportButtonsContainer.style.marginBottom = '15px';
+  
+  // Create JSON export button
+  const exportJsonButton = document.createElement('button');
+  exportJsonButton.textContent = 'Export as JSON';
+  exportJsonButton.style.marginRight = '10px';
+  exportJsonButton.style.padding = '5px 10px';
+  exportJsonButton.style.backgroundColor = '#4285f4';
+  exportJsonButton.style.color = 'white';
+  exportJsonButton.style.border = 'none';
+  exportJsonButton.style.borderRadius = '3px';
+  exportJsonButton.style.cursor = 'pointer';
+  exportJsonButton.addEventListener('click', () => {
+    const jsonData = JSON.stringify(overviews, null, 2);
+    const blob = new Blob([jsonData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `waterloo-works-job-overviews-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+  exportButtonsContainer.appendChild(exportJsonButton);
+  
+  container.appendChild(exportButtonsContainer);
+  
+  // Create overviews list
+  const list = document.createElement('div');
+  list.style.maxHeight = '500px';
+  list.style.overflowY = 'auto';
+  list.style.border = '1px solid #ddd';
+  list.style.borderRadius = '5px';
+  list.style.padding = '10px';
+  
+  overviews.forEach(({ jobId, overview }) => {
+    const overviewCard = document.createElement('div');
+    overviewCard.style.marginBottom = '20px';
+    overviewCard.style.padding = '10px';
+    overviewCard.style.backgroundColor = '#f5f5f5';
+    overviewCard.style.borderRadius = '5px';
+    overviewCard.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+    
+    const title = document.createElement('h3');
+    title.textContent = `Job ID: ${jobId}`;
+    title.style.marginTop = '0';
+    title.style.marginBottom = '10px';
+    title.style.color = '#4285f4';
+    overviewCard.appendChild(title);
+    
+    // Create an expandable/collapsible section
+    const toggleButton = document.createElement('button');
+    toggleButton.textContent = 'Show Details';
+    toggleButton.style.padding = '3px 8px';
+    toggleButton.style.backgroundColor = '#f1f1f1';
+    toggleButton.style.border = '1px solid #ddd';
+    toggleButton.style.borderRadius = '3px';
+    toggleButton.style.cursor = 'pointer';
+    toggleButton.style.marginBottom = '10px';
+    overviewCard.appendChild(toggleButton);
+    
+    const detailsContainer = document.createElement('div');
+    detailsContainer.style.display = 'none';
+    
+    // Add a table with key-value pairs from the overview
+    const table = document.createElement('table');
+    table.style.width = '100%';
+    table.style.borderCollapse = 'collapse';
+    
+    Object.entries(overview).forEach(([key, value]) => {
+      const row = document.createElement('tr');
+      
+      const keyCell = document.createElement('td');
+      keyCell.textContent = key;
+      keyCell.style.padding = '5px';
+      keyCell.style.fontWeight = 'bold';
+      keyCell.style.width = '30%';
+      keyCell.style.verticalAlign = 'top';
+      keyCell.style.borderBottom = '1px solid #ddd';
+      row.appendChild(keyCell);
+      
+      const valueCell = document.createElement('td');
+      
+      // Convert HTML content to plain text if needed
+      if (value && (value.includes('<') && value.includes('>'))) {
+        try {
+          // Parse HTML into a document
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(value, 'text/html');
+          // Extract text content
+          valueCell.textContent = doc.body.textContent || value;
+        } catch (error) {
+          // Fallback to original value if parsing fails
+          valueCell.textContent = value;
+        }
+      } else {
+        valueCell.textContent = value;
+      }
+      
+      valueCell.style.padding = '5px';
+      valueCell.style.verticalAlign = 'top';
+      valueCell.style.borderBottom = '1px solid #ddd';
+      valueCell.style.whiteSpace = 'pre-wrap'; // Preserve line breaks in text
+      valueCell.style.wordBreak = 'break-word'; // Break long words if needed
+      row.appendChild(valueCell);
+      
+      table.appendChild(row);
+    });
+    
+    detailsContainer.appendChild(table);
+    overviewCard.appendChild(detailsContainer);
+    
+    // Toggle details on button click
+    toggleButton.addEventListener('click', () => {
+      const isVisible = detailsContainer.style.display === 'block';
+      detailsContainer.style.display = isVisible ? 'none' : 'block';
+      toggleButton.textContent = isVisible ? 'Show Details' : 'Hide Details';
+    });
+    
+    list.appendChild(overviewCard);
+  });
+  
+  container.appendChild(list);
 } 

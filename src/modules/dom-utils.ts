@@ -1,11 +1,12 @@
 // DOM utility functions
 
-import { TableProcessingResult, JobDetails } from './types';
+import {JobOverview } from './types';
 
 /**
  * Creates a styled container for displaying information
  * @ returns The created container element
  */
+
 export function createStyledContainer(): HTMLDivElement {
   const container = document.createElement('div');
   container.className = 'tr-counter-container';
@@ -127,14 +128,13 @@ function showExtensionDescription(): void {
     <ul>
       <li><strong>TR Counter:</strong> Counts the number of table rows (jobs) on the page</li>
       <li><strong>Job ID Extraction:</strong> Extracts and displays all job IDs from the table</li>
-      <li><strong>Job Details Scraping:</strong> Extracts detailed information about each job</li>
-      <li><strong>Data Export:</strong> Allows you to download job details as JSON or CSV</li>
+      <li><strong>Job Overview Fetching:</strong> Extracts detailed overview information about each job</li>
+      <li><strong>Data Export:</strong> Allows you to download job overviews as JSON or CSV</li>
     </ul>
     <h3>How to Use</h3>
     <ol>
       <li>Navigate to the WaterlooWorks job listings page</li>
-      <li>Click the "Scrape" button to count rows and extract job IDs</li>
-      <li>Click the "Scrape Job Details" button to extract detailed information about each job</li>
+      <li>Click the "Fetch Job Overviews" button to extract detailed information about each job</li>
       <li>Use the download buttons to export the data in your preferred format</li>
     </ol>
     <p><strong>Note:</strong> This extension works with the latest WaterlooWorks UI and extracts information directly from the page without making additional network requests.</p>
@@ -159,41 +159,6 @@ function showExtensionDescription(): void {
       document.body.removeChild(modal);
     }
   });
-}
-
-/**
- * Creates a scrape button element
- * @ returns The created scrape button element
- */
-export function createScrapeButton(): HTMLButtonElement {
-  const scrapeButton = document.createElement('button');
-  scrapeButton.textContent = 'Scrape';
-  scrapeButton.style.padding = '5px 10px';
-  scrapeButton.style.backgroundColor = '#4285f4';
-  scrapeButton.style.color = 'white';
-  scrapeButton.style.border = 'none';
-  scrapeButton.style.borderRadius = '3px';
-  scrapeButton.style.cursor = 'pointer';
-  
-  return scrapeButton;
-}
-
-/**
- * Creates a scrape job details button element
- * @ returns The created scrape job details button element
- */
-export function createScrapeJobDetailsButton(): HTMLButtonElement {
-  const scrapeJobDetailsButton = document.createElement('button');
-  scrapeJobDetailsButton.textContent = 'Scrape Job Details';
-  scrapeJobDetailsButton.style.padding = '5px 10px';
-  scrapeJobDetailsButton.style.backgroundColor = '#34a853';
-  scrapeJobDetailsButton.style.color = 'white';
-  scrapeJobDetailsButton.style.border = 'none';
-  scrapeJobDetailsButton.style.borderRadius = '3px';
-  scrapeJobDetailsButton.style.cursor = 'pointer';
-  scrapeJobDetailsButton.style.marginLeft = '10px';
-  
-  return scrapeJobDetailsButton;
 }
 
 /**
@@ -229,420 +194,397 @@ export function createJobDetailsDisplay(): HTMLDivElement {
 }
 
 /**
- * Creates a loading indicator element
- * @ returns The created loading indicator element
+ * Creates a loading indicator element with progress bar
+ * @returns The created loading indicator element
  */
 export function createLoadingIndicator(): HTMLDivElement {
   const loadingIndicator = document.createElement('div');
   loadingIndicator.className = 'loading-indicator';
-  loadingIndicator.textContent = 'Loading job details...';
   loadingIndicator.style.marginTop = '10px';
-  loadingIndicator.style.color = '#666';
-  loadingIndicator.style.fontStyle = 'italic';
+  loadingIndicator.style.width = '100%';
   loadingIndicator.style.display = 'none'; // Initially hidden
+  
+  // Create status text
+  const statusText = document.createElement('div');
+  statusText.className = 'loading-status-text';
+  statusText.textContent = 'Loading job overviews...';
+  statusText.style.color = '#666';
+  statusText.style.fontStyle = 'italic';
+  statusText.style.marginBottom = '8px';
+  loadingIndicator.appendChild(statusText);
+  
+  // Create progress container
+  const progressContainer = document.createElement('div');
+  progressContainer.className = 'progress-container';
+  progressContainer.style.width = '100%';
+  progressContainer.style.height = '10px';
+  progressContainer.style.backgroundColor = '#e0e0e0';
+  progressContainer.style.borderRadius = '5px';
+  progressContainer.style.overflow = 'hidden';
+  
+  // Create progress bar
+  const progressBar = document.createElement('div');
+  progressBar.className = 'progress-bar';
+  progressBar.style.width = '0%';
+  progressBar.style.height = '100%';
+  progressBar.style.backgroundColor = '#fbbc05';
+  progressBar.style.transition = 'width 0.3s ease-in-out';
+  progressContainer.appendChild(progressBar);
+  
+  loadingIndicator.appendChild(progressContainer);
+  
+  // Create percentage text
+  const percentageText = document.createElement('div');
+  percentageText.className = 'percentage-text';
+  percentageText.textContent = '0%';
+  percentageText.style.color = '#666';
+  percentageText.style.fontSize = '12px';
+  percentageText.style.marginTop = '4px';
+  percentageText.style.textAlign = 'right';
+  loadingIndicator.appendChild(percentageText);
   
   return loadingIndicator;
 }
 
 /**
- * Processes a table to extract TR count and job IDs
- * @ param table The table element to process
- * @ returns Object containing TR count and job IDs
+ * Updates the loading indicator progress
+ * @param loadingIndicator The loading indicator element
+ * @param progress The progress value between 0 and 100
+ * @param statusMessage Optional status message to display
  */
-export function processTable(table: HTMLTableElement): TableProcessingResult {
-  const trElements = table.getElementsByTagName('tr');
-  const trCount = trElements.length;
+export function updateLoadingProgress(loadingIndicator: HTMLDivElement, progress: number, statusMessage?: string): void {
+  const progressBar = loadingIndicator.querySelector('.progress-bar') as HTMLDivElement;
+  const percentageText = loadingIndicator.querySelector('.percentage-text') as HTMLDivElement;
+  const statusText = loadingIndicator.querySelector('.loading-status-text') as HTMLDivElement;
   
-  // Scrape JobIds from the first <td> in each row (new UI structure)
-  const jobIds: string[] = [];
-  for (let j = 0; j < trElements.length; j++) {
-    const tdElements = trElements[j].getElementsByTagName('td');
-    if (tdElements.length >= 1) {
-      const jobIdTd = tdElements[0]; // 1st td (0-indexed)
-      if (jobIdTd && jobIdTd.textContent) {
-        const jobId = jobIdTd.textContent.trim();
-        if (jobId && !isNaN(Number(jobId))) { // Ensure it's a numeric job ID
-          jobIds.push(jobId);
-        }
-      }
+  if (progressBar && percentageText) {
+    // Clamp progress between 0 and 100
+    const clampedProgress = Math.max(0, Math.min(100, progress));
+    
+    // Update progress bar width
+    progressBar.style.width = `${clampedProgress}%`;
+    
+    // Update percentage text
+    percentageText.textContent = `${Math.round(clampedProgress)}%`;
+    
+    // Update status message if provided
+    if (statusMessage && statusText) {
+      statusText.textContent = statusMessage;
     }
   }
-  
-  return { trCount, jobIds };
 }
 
 /**
- * Renders job details in the job details display element
- * @param jobDetailsDisplay The job details display element
- * @param jobDetails The job details to render
+ * Shows a popup with the raw HTML response
+ * @param rawHtml The raw HTML to display
+ * @param jobId The job ID for the popup title
  */
-export function renderJobDetails(jobDetailsDisplay: HTMLDivElement, jobDetails: JobDetails[]): void {
+function showHtmlPopup(rawHtml: string, jobId: string): void {
+  // Create modal container
+  const modal = document.createElement('div');
+  modal.style.position = 'fixed';
+  modal.style.top = '0';
+  modal.style.left = '0';
+  modal.style.width = '100%';
+  modal.style.height = '100%';
+  modal.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+  modal.style.display = 'flex';
+  modal.style.justifyContent = 'center';
+  modal.style.alignItems = 'center';
+  modal.style.zIndex = '10000';
+  
+  // Create modal content
+  const modalContent = document.createElement('div');
+  modalContent.style.backgroundColor = 'white';
+  modalContent.style.padding = '20px';
+  modalContent.style.borderRadius = '5px';
+  modalContent.style.maxWidth = '90%';
+  modalContent.style.width = '1000px';
+  modalContent.style.maxHeight = '90vh';
+  modalContent.style.overflowY = 'auto';
+  modalContent.style.position = 'relative';
+  
+  // Create close button
+  const closeButton = document.createElement('button');
+  closeButton.textContent = '×';
+  closeButton.style.position = 'absolute';
+  closeButton.style.top = '10px';
+  closeButton.style.right = '10px';
+  closeButton.style.backgroundColor = 'transparent';
+  closeButton.style.border = 'none';
+  closeButton.style.fontSize = '24px';
+  closeButton.style.cursor = 'pointer';
+  closeButton.style.color = '#333';
+  closeButton.addEventListener('click', () => {
+    document.body.removeChild(modal);
+  });
+  
+  // Create title
+  const title = document.createElement('h2');
+  title.textContent = `HTML Response for Job ID: ${jobId}`;
+  title.style.marginTop = '0';
+  title.style.marginBottom = '15px';
+  title.style.color = '#4285f4';
+  
+  // Create container for HTML content
+  const htmlContainer = document.createElement('div');
+  htmlContainer.style.border = '1px solid #ddd';
+  htmlContainer.style.padding = '10px';
+  htmlContainer.style.backgroundColor = '#f5f5f5';
+  htmlContainer.style.borderRadius = '4px';
+  htmlContainer.style.fontFamily = 'monospace';
+  htmlContainer.style.fontSize = '12px';
+  htmlContainer.style.whiteSpace = 'pre-wrap';
+  htmlContainer.style.overflowX = 'auto';
+  htmlContainer.style.maxHeight = 'calc(90vh - 120px)';
+  
+  // Format the HTML for display - we'll use a simple approach to show the raw HTML
+  // Note: For security, we're not using innerHTML, but showing the HTML as text
+  htmlContainer.textContent = rawHtml;
+  
+  // Add elements to modal content
+  modalContent.appendChild(closeButton);
+  modalContent.appendChild(title);
+  modalContent.appendChild(htmlContainer);
+  
+  // Add modal content to modal
+  modal.appendChild(modalContent);
+  
+  // Add modal to body
+  document.body.appendChild(modal);
+  
+  // Close modal when clicking outside
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) {
+      document.body.removeChild(modal);
+    }
+  });
+}
+
+/**
+ * Renders job overviews in the job details display element
+ * @param container The job details display element
+ * @param overviews The job overviews to render
+ */
+export function renderJobOverviews(container: HTMLDivElement, overviews: JobOverview[]): void {
   // Clear previous content
-  jobDetailsDisplay.innerHTML = '';
-  
-  if (jobDetails.length === 0) {
-    const noDetailsMessage = document.createElement('p');
-    noDetailsMessage.textContent = 'No job details found.';
-    jobDetailsDisplay.appendChild(noDetailsMessage);
-    return;
-  }
-  
-  // Create a container for the job details
-  const detailsContainer = document.createElement('div');
-  detailsContainer.style.maxHeight = '500px';
-  detailsContainer.style.overflowY = 'auto';
-  detailsContainer.style.border = '1px solid #ddd';
-  detailsContainer.style.borderRadius = '5px';
-  detailsContainer.style.padding = '10px';
-  
-  // Create a table for the job details
-  const table = document.createElement('table');
-  table.style.width = '100%';
-  table.style.borderCollapse = 'collapse';
-  
-  // Mark this table as already processed to prevent duplicate buttons
-  table.setAttribute('data-tr-counter-added', 'true');
-  
-  // Create table header
-  const thead = document.createElement('thead');
-  const headerRow = document.createElement('tr');
-  
-  const headers = [
-    'Job ID', 
-    'Job Title', 
-    'Organization', 
-    'Location/City', 
-    'Term', 
-    'Openings', 
-    'Status', 
-    'Level', 
-    'Deadline'
-  ];
-  
-  headers.forEach(headerText => {
-    const th = document.createElement('th');
-    th.textContent = headerText;
-    th.style.padding = '8px';
-    th.style.textAlign = 'left';
-    th.style.borderBottom = '2px solid #ddd';
-    headerRow.appendChild(th);
-  });
-  
-  thead.appendChild(headerRow);
-  table.appendChild(thead);
-  
-  // Create table body
-  const tbody = document.createElement('tbody');
-  
-  jobDetails.forEach(job => {
-    const row = document.createElement('tr');
-    
-    // Job ID
-    const jobIdCell = document.createElement('td');
-    jobIdCell.textContent = job.jobId;
-    jobIdCell.style.padding = '8px';
-    jobIdCell.style.borderBottom = '1px solid #ddd';
-    row.appendChild(jobIdCell);
-    
-    // Job Title
-    const jobTitleCell = document.createElement('td');
-    jobTitleCell.textContent = job.jobTitle || 'N/A';
-    jobTitleCell.style.padding = '8px';
-    jobTitleCell.style.borderBottom = '1px solid #ddd';
-    row.appendChild(jobTitleCell);
-    
-    // Organization
-    const organizationCell = document.createElement('td');
-    organizationCell.textContent = job.organization || 'N/A';
-    organizationCell.style.padding = '8px';
-    organizationCell.style.borderBottom = '1px solid #ddd';
-    row.appendChild(organizationCell);
-    
-    // Location/City
-    const locationCell = document.createElement('td');
-    const locationText = [job.location, job.city].filter(Boolean).join(' / ') || 'N/A';
-    locationCell.textContent = locationText;
-    locationCell.style.padding = '8px';
-    locationCell.style.borderBottom = '1px solid #ddd';
-    row.appendChild(locationCell);
-    
-    // Term
-    const termCell = document.createElement('td');
-    termCell.textContent = job.term || 'N/A';
-    termCell.style.padding = '8px';
-    termCell.style.borderBottom = '1px solid #ddd';
-    row.appendChild(termCell);
-    
-    // Openings
-    const openingsCell = document.createElement('td');
-    openingsCell.textContent = job.openings || 'N/A';
-    openingsCell.style.padding = '8px';
-    openingsCell.style.borderBottom = '1px solid #ddd';
-    row.appendChild(openingsCell);
-    
-    // Status
-    const statusCell = document.createElement('td');
-    statusCell.textContent = job.status || 'N/A';
-    statusCell.style.padding = '8px';
-    statusCell.style.borderBottom = '1px solid #ddd';
-    row.appendChild(statusCell);
-    
-    // Level
-    const levelCell = document.createElement('td');
-    levelCell.textContent = job.level || 'N/A';
-    levelCell.style.padding = '8px';
-    levelCell.style.borderBottom = '1px solid #ddd';
-    row.appendChild(levelCell);
-    
-    // Deadline
-    const deadlineCell = document.createElement('td');
-    deadlineCell.textContent = job.deadline || 'N/A';
-    deadlineCell.style.padding = '8px';
-    deadlineCell.style.borderBottom = '1px solid #ddd';
-    row.appendChild(deadlineCell);
-    
-    tbody.appendChild(row);
-  });
-  
-  table.appendChild(tbody);
-  detailsContainer.appendChild(table);
-  
-  // Add a download button
-  const downloadButton = document.createElement('button');
-  downloadButton.textContent = 'Download Job Details (JSON)';
-  downloadButton.style.marginTop = '10px';
-  downloadButton.style.padding = '5px 10px';
-  downloadButton.style.backgroundColor = '#4285f4';
-  downloadButton.style.color = 'white';
-  downloadButton.style.border = 'none';
-  downloadButton.style.borderRadius = '3px';
-  downloadButton.style.cursor = 'pointer';
-  
-  downloadButton.addEventListener('click', () => {
-    // Create a JSON blob
-    const jsonBlob = new Blob([JSON.stringify(jobDetails, null, 2)], { type: 'application/json' });
-    
-    // Create a download link
-    const downloadLink = document.createElement('a');
-    downloadLink.href = URL.createObjectURL(jsonBlob);
-    downloadLink.download = `waterlooworks_jobs_${new Date().toISOString().split('T')[0]}.json`;
-    
-    // Trigger the download
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
-  });
-  
-  detailsContainer.appendChild(downloadButton);
-  
-  // Add a CSV download button
-  const csvDownloadButton = document.createElement('button');
-  csvDownloadButton.textContent = 'Download Job Details (CSV)';
-  csvDownloadButton.style.marginTop = '10px';
-  csvDownloadButton.style.marginLeft = '10px';
-  csvDownloadButton.style.padding = '5px 10px';
-  csvDownloadButton.style.backgroundColor = '#34a853';
-  csvDownloadButton.style.color = 'white';
-  csvDownloadButton.style.border = 'none';
-  csvDownloadButton.style.borderRadius = '3px';
-  csvDownloadButton.style.cursor = 'pointer';
-  
-  csvDownloadButton.addEventListener('click', () => {
-    // Create CSV header
-    const csvHeader = [
-      'Job ID',
-      'Job Title',
-      'Organization',
-      'Location',
-      'City',
-      'Term',
-      'Openings',
-      'Status',
-      'Level',
-      'Deadline',
-      'Scraped At'
-    ].join(',');
-    
-    // Create CSV rows
-    const csvRows = jobDetails.map(job => [
-      `"${job.jobId || ''}"`,
-      `"${(job.jobTitle || '').replace(/"/g, '""')}"`,
-      `"${(job.organization || '').replace(/"/g, '""')}"`,
-      `"${(job.location || '').replace(/"/g, '""')}"`,
-      `"${(job.city || '').replace(/"/g, '""')}"`,
-      `"${(job.term || '').replace(/"/g, '""')}"`,
-      `"${(job.openings || '').replace(/"/g, '""')}"`,
-      `"${(job.status || '').replace(/"/g, '""')}"`,
-      `"${(job.level || '').replace(/"/g, '""')}"`,
-      `"${(job.deadline || '').replace(/"/g, '""')}"`,
-      `"${job.scrapedAt || ''}"`
-    ].join(','));
-    
-    // Combine header and rows
-    const csvContent = [csvHeader, ...csvRows].join('\n');
-    
-    // Create a CSV blob
-    const csvBlob = new Blob([csvContent], { type: 'text/csv' });
-    
-    // Create a download link
-    const downloadLink = document.createElement('a');
-    downloadLink.href = URL.createObjectURL(csvBlob);
-    downloadLink.download = `waterlooworks_jobs_${new Date().toISOString().split('T')[0]}.csv`;
-    
-    // Trigger the download
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
-  });
-  
-  detailsContainer.appendChild(csvDownloadButton);
-  
-  // Show the job details
-  jobDetailsDisplay.style.display = 'block';
-  jobDetailsDisplay.appendChild(detailsContainer);
-}
-
-/**
- * Renders job overviews in the provided container
- * @param {HTMLDivElement} container - The container to render overviews in
- * @param {Array<{jobId: string, overview: Record<string, string>}>} overviews - Array of job overviews
- */
-export function renderJobOverviews(container: HTMLDivElement, overviews: Array<{jobId: string, overview: Record<string, string>}>): void {
-  // Clear container
   container.innerHTML = '';
   container.style.display = 'block';
   
-  // Create header
-  const header = document.createElement('h2');
-  header.textContent = `Job Overviews (${overviews.length})`;
-  header.style.marginTop = '20px';
-  header.style.marginBottom = '10px';
-  container.appendChild(header);
+  if (overviews.length === 0) {
+    const noDetailsMessage = document.createElement('p');
+    noDetailsMessage.textContent = 'No job overviews found.';
+    container.appendChild(noDetailsMessage);
+    return;
+  }
   
-  // Create export buttons
-  const exportButtonsContainer = document.createElement('div');
-  exportButtonsContainer.style.marginBottom = '15px';
+  // Create a container for the job overviews
+  const overviewsContainer = document.createElement('div');
+  overviewsContainer.style.maxHeight = '500px';
+  overviewsContainer.style.overflowY = 'auto';
+  overviewsContainer.style.border = '1px solid #ddd';
+  overviewsContainer.style.borderRadius = '5px';
+  overviewsContainer.style.padding = '10px';
   
-  // Create JSON export button
-  const exportJsonButton = document.createElement('button');
-  exportJsonButton.textContent = 'Export as JSON';
-  exportJsonButton.style.marginRight = '10px';
-  exportJsonButton.style.padding = '5px 10px';
-  exportJsonButton.style.backgroundColor = '#4285f4';
-  exportJsonButton.style.color = 'white';
-  exportJsonButton.style.border = 'none';
-  exportJsonButton.style.borderRadius = '3px';
-  exportJsonButton.style.cursor = 'pointer';
-  exportJsonButton.addEventListener('click', () => {
-    const jsonData = JSON.stringify(overviews, null, 2);
-    const blob = new Blob([jsonData], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `waterloo-works-job-overviews-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  // Show the number of jobs fetched
+  const statsMessage = document.createElement('p');
+  statsMessage.textContent = `Fetched overviews for ${overviews.length} jobs.`;
+  statsMessage.style.marginBottom = '15px';
+  statsMessage.style.fontWeight = 'bold';
+  overviewsContainer.appendChild(statsMessage);
+  
+  // Create a container for action buttons
+  const actionsContainer = document.createElement('div');
+  actionsContainer.style.marginBottom = '15px';
+  actionsContainer.style.display = 'flex';
+  actionsContainer.style.gap = '10px';
+  
+  // Add download as JSON button
+  const downloadJsonButton = document.createElement('button');
+  downloadJsonButton.textContent = 'Download as JSON';
+  downloadJsonButton.style.padding = '5px 10px';
+  downloadJsonButton.style.backgroundColor = '#4285f4';
+  downloadJsonButton.style.color = 'white';
+  downloadJsonButton.style.border = 'none';
+  downloadJsonButton.style.borderRadius = '3px';
+  downloadJsonButton.style.cursor = 'pointer';
+  downloadJsonButton.addEventListener('click', () => {
+    downloadAsJson(overviews, 'job_overviews.json');
   });
-  exportButtonsContainer.appendChild(exportJsonButton);
+  actionsContainer.appendChild(downloadJsonButton);
   
-  container.appendChild(exportButtonsContainer);
+  // Add download as CSV button
+  const downloadCsvButton = document.createElement('button');
+  downloadCsvButton.textContent = 'Download as CSV';
+  downloadCsvButton.style.padding = '5px 10px';
+  downloadCsvButton.style.backgroundColor = '#34a853';
+  downloadCsvButton.style.color = 'white';
+  downloadCsvButton.style.border = 'none';
+  downloadCsvButton.style.borderRadius = '3px';
+  downloadCsvButton.style.cursor = 'pointer';
+  downloadCsvButton.addEventListener('click', () => {
+    downloadAsCsv(overviews, 'job_overviews.csv');
+  });
+  actionsContainer.appendChild(downloadCsvButton);
   
-  // Create overviews list
-  const list = document.createElement('div');
-  list.style.maxHeight = '500px';
-  list.style.overflowY = 'auto';
-  list.style.border = '1px solid #ddd';
-  list.style.borderRadius = '5px';
-  list.style.padding = '10px';
+  // Add to container
+  overviewsContainer.appendChild(actionsContainer);
   
-  overviews.forEach(({ jobId, overview }) => {
-    const overviewCard = document.createElement('div');
-    overviewCard.style.marginBottom = '20px';
-    overviewCard.style.padding = '10px';
-    overviewCard.style.backgroundColor = '#f5f5f5';
-    overviewCard.style.borderRadius = '5px';
-    overviewCard.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+  // Create a job overview cards
+  for (const { jobId, overview, rawHtml } of overviews) {
+    const jobCard = document.createElement('div');
+    jobCard.style.border = '1px solid #ddd';
+    jobCard.style.borderRadius = '5px';
+    jobCard.style.padding = '10px';
+    jobCard.style.marginBottom = '15px';
     
-    const title = document.createElement('h3');
-    title.textContent = `Job ID: ${jobId}`;
-    title.style.marginTop = '0';
-    title.style.marginBottom = '10px';
-    title.style.color = '#4285f4';
-    overviewCard.appendChild(title);
+    // Create header container with job ID and Show HTML button
+    const headerContainer = document.createElement('div');
+    headerContainer.style.display = 'flex';
+    headerContainer.style.justifyContent = 'space-between';
+    headerContainer.style.alignItems = 'center';
+    headerContainer.style.marginBottom = '10px';
     
-    // Create an expandable/collapsible section
-    const toggleButton = document.createElement('button');
-    toggleButton.textContent = 'Show Details';
-    toggleButton.style.padding = '3px 8px';
-    toggleButton.style.backgroundColor = '#f1f1f1';
-    toggleButton.style.border = '1px solid #ddd';
-    toggleButton.style.borderRadius = '3px';
-    toggleButton.style.cursor = 'pointer';
-    toggleButton.style.marginBottom = '10px';
-    overviewCard.appendChild(toggleButton);
+    // Job ID as header
+    const jobIdHeader = document.createElement('h3');
+    jobIdHeader.textContent = `Job ID: ${jobId}`;
+    jobIdHeader.style.margin = '0';
+    jobIdHeader.style.color = '#4285f4';
+    headerContainer.appendChild(jobIdHeader);
     
-    const detailsContainer = document.createElement('div');
-    detailsContainer.style.display = 'none';
+    // Add Show HTML button if rawHtml exists
+    if (rawHtml) {
+      const showHtmlButton = document.createElement('button');
+      showHtmlButton.textContent = 'Show HTML';
+      showHtmlButton.style.padding = '4px 8px';
+      showHtmlButton.style.backgroundColor = '#9e9e9e';
+      showHtmlButton.style.color = 'white';
+      showHtmlButton.style.border = 'none';
+      showHtmlButton.style.borderRadius = '3px';
+      showHtmlButton.style.cursor = 'pointer';
+      showHtmlButton.style.fontSize = '12px';
+      
+      // Add click event to show HTML popup
+      showHtmlButton.addEventListener('click', () => {
+        showHtmlPopup(rawHtml, jobId);
+      });
+      
+      headerContainer.appendChild(showHtmlButton);
+    }
     
-    // Add a table with key-value pairs from the overview
-    const table = document.createElement('table');
-    table.style.width = '100%';
-    table.style.borderCollapse = 'collapse';
+    jobCard.appendChild(headerContainer);
     
-    Object.entries(overview).forEach(([key, value]) => {
+    // Job Title if available
+    if (overview['Job Title']) {
+      const jobTitle = document.createElement('h4');
+      jobTitle.textContent = overview['Job Title'];
+      jobTitle.style.margin = '0 0 10px 0';
+      jobCard.appendChild(jobTitle);
+    }
+    
+    // Create a details table
+    const detailsTable = document.createElement('table');
+    detailsTable.style.width = '100%';
+    detailsTable.style.borderCollapse = 'collapse';
+    
+    // Add all overview fields
+    for (const [key, value] of Object.entries(overview)) {
+      // Skip job title as it's already displayed as header
+      if (key === 'Job Title') continue;
+      
       const row = document.createElement('tr');
       
       const keyCell = document.createElement('td');
       keyCell.textContent = key;
       keyCell.style.padding = '5px';
+      keyCell.style.borderBottom = '1px solid #eee';
       keyCell.style.fontWeight = 'bold';
       keyCell.style.width = '30%';
-      keyCell.style.verticalAlign = 'top';
-      keyCell.style.borderBottom = '1px solid #ddd';
       row.appendChild(keyCell);
       
       const valueCell = document.createElement('td');
-      
-      // Convert HTML content to plain text if needed
-      if (value && (value.includes('<') && value.includes('>'))) {
-        try {
-          // Parse HTML into a document
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(value, 'text/html');
-          // Extract text content
-          valueCell.textContent = doc.body.textContent || value;
-        } catch (error) {
-          // Fallback to original value if parsing fails
-          valueCell.textContent = value;
-        }
-      } else {
-        valueCell.textContent = value;
-      }
-      
+      valueCell.textContent = value;
       valueCell.style.padding = '5px';
-      valueCell.style.verticalAlign = 'top';
-      valueCell.style.borderBottom = '1px solid #ddd';
-      valueCell.style.whiteSpace = 'pre-wrap'; // Preserve line breaks in text
-      valueCell.style.wordBreak = 'break-word'; // Break long words if needed
+      valueCell.style.borderBottom = '1px solid #eee';
+      valueCell.style.width = '70%';
       row.appendChild(valueCell);
       
-      table.appendChild(row);
-    });
+      detailsTable.appendChild(row);
+    }
     
-    detailsContainer.appendChild(table);
-    overviewCard.appendChild(detailsContainer);
-    
-    // Toggle details on button click
-    toggleButton.addEventListener('click', () => {
-      const isVisible = detailsContainer.style.display === 'block';
-      detailsContainer.style.display = isVisible ? 'none' : 'block';
-      toggleButton.textContent = isVisible ? 'Show Details' : 'Hide Details';
-    });
-    
-    list.appendChild(overviewCard);
+    jobCard.appendChild(detailsTable);
+    overviewsContainer.appendChild(jobCard);
+  }
+  
+  // Add to main container
+  container.appendChild(overviewsContainer);
+}
+
+/**
+ * Downloads the given data as a JSON file
+ * @param data The data to download
+ * @param filename The name of the file
+ */
+function downloadAsJson(data: any, filename: string): void {
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Downloads the given data as a CSV file
+ * @param overviews The job overviews to download
+ * @param filename The name of the file
+ */
+function downloadAsCsv(overviews: JobOverview[], filename: string): void {
+  // Get all unique keys from all overviews
+  const allKeys = new Set<string>();
+  allKeys.add('JobId'); // Always include JobId
+  
+  overviews.forEach(({ overview }) => {
+    Object.keys(overview).forEach(key => allKeys.add(key));
   });
   
-  container.appendChild(list);
+  // Convert to array and sort
+  const headers = Array.from(allKeys);
+  
+  // Create CSV content
+  let csv = headers.join(',') + '\n';
+  
+  overviews.forEach(({ jobId, overview }) => {
+    const row = headers.map(header => {
+      if (header === 'JobId') return jobId;
+      
+      // Get value for this header, or empty string if not present
+      let value = overview[header] || '';
+      
+      // Escape quotes and wrap in quotes if contains comma or newline
+      if (value.includes('"')) value = value.replace(/"/g, '""');
+      if (value.includes(',') || value.includes('\n') || value.includes('"')) {
+        value = `"${value}"`;
+      }
+      
+      return value;
+    });
+    
+    csv += row.join(',') + '\n';
+  });
+  
+  // Create blob and download
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  
+  URL.revokeObjectURL(url);
 } 

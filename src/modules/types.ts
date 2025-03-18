@@ -35,6 +35,13 @@ export interface JobDetails {
   scrapedAt: string;
 }
 
+// Job overview type with raw HTML
+export interface JobOverview {
+  jobId: string;
+  overview: Record<string, string>;
+  rawHtml?: string;
+}
+
 // Extended table processing result with job details
 export interface ExtendedTableProcessingResult extends TableProcessingResult {
   jobDetails: JobDetails[];

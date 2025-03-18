@@ -4,22 +4,19 @@ import {
   createStyledContainer, 
   createTrCountDisplay, 
   createJobIdsDisplay, 
-  createScrapeButton,
-  createScrapeJobDetailsButton,
-  createJobDetailsDisplay,
-  createLoadingIndicator,
   createDescriptionButton,
   createFetchOverviewsButton,
-  processTable,
-  renderJobDetails,
+  createJobDetailsDisplay,
+  createLoadingIndicator,
+  updateLoadingProgress,
   renderJobOverviews
 } from './dom-utils';
 
-import { scrapeAllJobDetails, fetchAllJobOverviews } from './scraper';
+import { fetchAllJobOverviews } from './scraper';
 import { JobDetails } from './types';
 
 /**
- * Adds TR counter and scrape button above WaterlooWorks tables
+ * Adds TR counter and buttons above WaterlooWorks tables
  */
 export function addTrCounterAndButton(): void {
   // Find all tables on the page that match the new WaterlooWorks UI
@@ -53,12 +50,6 @@ export function addTrCounterAndButton(): void {
     // Create job IDs display
     const jobIdsDisplay = createJobIdsDisplay();
     
-    // Create scrape button
-    const scrapeButton = createScrapeButton();
-    
-    // Create scrape job details button
-    const scrapeJobDetailsButton = createScrapeJobDetailsButton();
-    
     // Create fetch job overviews button
     const fetchOverviewsButton = createFetchOverviewsButton();
     
@@ -71,62 +62,23 @@ export function addTrCounterAndButton(): void {
     // Create loading indicator
     const loadingIndicator = createLoadingIndicator();
     
-    // Add click event to the scrape button
-    scrapeButton.addEventListener('click', () => {
-      const { trCount, jobIds } = processTable(table);
-      
-      // Update the TR count display
-      trCountDisplay.textContent = `TR Count: ${trCount}`;
-      
-      // Display the JobIds as a comma-separated list
-      if (jobIds.length > 0) {
-        jobIdsDisplay.textContent = `Job IDs: ${jobIds.join(', ')}`;
-      } else {
-        jobIdsDisplay.textContent = 'No Job IDs found';
-      }
-    });
-    
-    // Add click event to the scrape job details button
-    scrapeJobDetailsButton.addEventListener('click', async () => {
-      try {
-        // Show loading indicator
-        loadingIndicator.style.display = 'block';
-        jobDetailsDisplay.style.display = 'none';
-        
-        // Scrape all job details
-        const jobDetails: JobDetails[] = await scrapeAllJobDetails();
-        
-        // Hide loading indicator
-        loadingIndicator.style.display = 'none';
-        
-        // Render job details
-        renderJobDetails(jobDetailsDisplay, jobDetails);
-        
-        // Save job details to chrome.storage.local
-        chrome.storage.local.set({ jobDetails: jobDetails }, () => {
-          console.log('Job details saved to chrome.storage.local');
-        });
-      } catch (error: unknown) {
-        console.error('Error scraping job details:', error);
-        
-        // Hide loading indicator
-        loadingIndicator.style.display = 'none';
-        
-        // Show error message
-        jobDetailsDisplay.style.display = 'block';
-        jobDetailsDisplay.innerHTML = `<p style="color: red;">Error scraping job details: ${error instanceof Error ? error.message : String(error)}</p>`;
-      }
-    });
-    
     // Add click event to the fetch job overviews button
     fetchOverviewsButton.addEventListener('click', async () => {
       try {
-        // Show loading indicator
+        // Reset and show loading indicator
+        updateLoadingProgress(loadingIndicator, 0, 'Initializing job overview fetch...');
         loadingIndicator.style.display = 'block';
         jobDetailsDisplay.style.display = 'none';
         
-        // Fetch all job overviews
-        const jobOverviews = await fetchAllJobOverviews();
+        // Disable the button to prevent multiple clicks
+        fetchOverviewsButton.disabled = true;
+        fetchOverviewsButton.style.opacity = '0.7';
+        fetchOverviewsButton.style.cursor = 'not-allowed';
+        
+        // Fetch all job overviews with progress updates
+        const jobOverviews = await fetchAllJobOverviews((progress, message) => {
+          updateLoadingProgress(loadingIndicator, progress, message);
+        });
         
         // Hide loading indicator
         loadingIndicator.style.display = 'none';
@@ -138,6 +90,11 @@ export function addTrCounterAndButton(): void {
         chrome.storage.local.set({ jobOverviews: jobOverviews }, () => {
           console.log('Job overviews saved to chrome.storage.local');
         });
+        
+        // Re-enable the button
+        fetchOverviewsButton.disabled = false;
+        fetchOverviewsButton.style.opacity = '1';
+        fetchOverviewsButton.style.cursor = 'pointer';
       } catch (error: unknown) {
         console.error('Error fetching job overviews:', error);
         
@@ -147,13 +104,16 @@ export function addTrCounterAndButton(): void {
         // Show error message
         jobDetailsDisplay.style.display = 'block';
         jobDetailsDisplay.innerHTML = `<p style="color: red;">Error fetching job overviews: ${error instanceof Error ? error.message : String(error)}</p>`;
+        
+        // Re-enable the button
+        fetchOverviewsButton.disabled = false;
+        fetchOverviewsButton.style.opacity = '1';
+        fetchOverviewsButton.style.cursor = 'pointer';
       }
     });
     
     // Add elements to container
     container.appendChild(trCountDisplay);
-    container.appendChild(scrapeButton);
-    container.appendChild(scrapeJobDetailsButton);
     container.appendChild(fetchOverviewsButton);
     container.appendChild(descriptionButton);
     container.appendChild(jobIdsDisplay);

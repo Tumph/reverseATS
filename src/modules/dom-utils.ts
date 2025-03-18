@@ -276,7 +276,7 @@ export function updateLoadingProgress(loadingIndicator: HTMLDivElement, progress
 }
 
 /**
- * Shows a popup with the raw HTML response
+ * Shows a popup with the HTML response for a job
  * @param rawHtml The raw HTML to display
  * @param jobId The job ID for the popup title
  */
@@ -322,37 +322,108 @@ function showHtmlPopup(rawHtml: string, jobId: string): void {
   
   // Create title
   const title = document.createElement('h2');
-  title.textContent = `HTML Response for Job ID: ${jobId}`;
+  title.textContent = `Job Details: ${jobId}`;
   title.style.marginTop = '0';
   title.style.marginBottom = '15px';
   title.style.color = '#4285f4';
   
-  // Create container for HTML content
-  const htmlContainer = document.createElement('div');
-  htmlContainer.style.border = '1px solid #ddd';
-  htmlContainer.style.padding = '10px';
-  htmlContainer.style.backgroundColor = '#f5f5f5';
-  htmlContainer.style.borderRadius = '4px';
-  htmlContainer.style.fontFamily = 'monospace';
-  htmlContainer.style.fontSize = '12px';
-  htmlContainer.style.whiteSpace = 'pre-wrap';
-  htmlContainer.style.overflowX = 'auto';
-  htmlContainer.style.maxHeight = 'calc(90vh - 120px)';
+  // Create toggle buttons for view modes
+  const toggleContainer = document.createElement('div');
+  toggleContainer.style.display = 'flex';
+  toggleContainer.style.marginBottom = '15px';
+  toggleContainer.style.gap = '10px';
   
-  // Format the HTML for display - we'll use a simple approach to show the raw HTML
-  // Note: For security, we're not using innerHTML, but showing the HTML as text
-  htmlContainer.textContent = rawHtml;
+  const previewButton = document.createElement('button');
+  previewButton.textContent = 'Preview';
+  previewButton.style.padding = '5px 15px';
+  previewButton.style.backgroundColor = '#4285f4';
+  previewButton.style.color = 'white';
+  previewButton.style.border = 'none';
+  previewButton.style.borderRadius = '3px';
+  previewButton.style.cursor = 'pointer';
+  
+  const sourceButton = document.createElement('button');
+  sourceButton.textContent = 'Source';
+  sourceButton.style.padding = '5px 15px';
+  sourceButton.style.backgroundColor = '#9e9e9e';
+  sourceButton.style.color = 'white';
+  sourceButton.style.border = 'none';
+  sourceButton.style.borderRadius = '3px';
+  sourceButton.style.cursor = 'pointer';
+  
+  toggleContainer.appendChild(previewButton);
+  toggleContainer.appendChild(sourceButton);
+  
+  // Create container for rendered HTML preview
+  const previewContainer = document.createElement('div');
+  previewContainer.style.border = '1px solid #ddd';
+  previewContainer.style.padding = '0';
+  previewContainer.style.backgroundColor = 'white';
+  previewContainer.style.borderRadius = '4px';
+  previewContainer.style.maxHeight = 'calc(90vh - 150px)';
+  previewContainer.style.display = 'block';
+  
+  // Create iframe to safely render the HTML
+  const iframe = document.createElement('iframe');
+  iframe.style.width = '100%';
+  iframe.style.height = '600px';
+  iframe.style.border = 'none';
+  iframe.style.backgroundColor = 'white';
+  previewContainer.appendChild(iframe);
+  
+  // Create container for HTML source code
+  const sourceContainer = document.createElement('div');
+  sourceContainer.style.border = '1px solid #ddd';
+  sourceContainer.style.padding = '10px';
+  sourceContainer.style.backgroundColor = '#f5f5f5';
+  sourceContainer.style.borderRadius = '4px';
+  sourceContainer.style.fontFamily = 'monospace';
+  sourceContainer.style.fontSize = '12px';
+  sourceContainer.style.whiteSpace = 'pre-wrap';
+  sourceContainer.style.overflowX = 'auto';
+  sourceContainer.style.maxHeight = 'calc(90vh - 150px)';
+  sourceContainer.style.display = 'none';
+  
+  // Set the HTML source code
+  sourceContainer.textContent = rawHtml;
+  
+  // Switch between preview and source views
+  previewButton.addEventListener('click', () => {
+    previewContainer.style.display = 'block';
+    sourceContainer.style.display = 'none';
+    previewButton.style.backgroundColor = '#4285f4';
+    sourceButton.style.backgroundColor = '#9e9e9e';
+  });
+  
+  sourceButton.addEventListener('click', () => {
+    previewContainer.style.display = 'none';
+    sourceContainer.style.display = 'block';
+    previewButton.style.backgroundColor = '#9e9e9e';
+    sourceButton.style.backgroundColor = '#4285f4';
+  });
   
   // Add elements to modal content
   modalContent.appendChild(closeButton);
   modalContent.appendChild(title);
-  modalContent.appendChild(htmlContainer);
+  modalContent.appendChild(toggleContainer);
+  modalContent.appendChild(previewContainer);
+  modalContent.appendChild(sourceContainer);
   
   // Add modal content to modal
   modal.appendChild(modalContent);
   
   // Add modal to body
   document.body.appendChild(modal);
+  
+  // Write HTML content to iframe after it's added to the DOM
+  setTimeout(() => {
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (iframeDoc) {
+      iframeDoc.open();
+      iframeDoc.write(rawHtml);
+      iframeDoc.close();
+    }
+  }, 0);
   
   // Close modal when clicking outside
   modal.addEventListener('click', (event) => {
@@ -456,7 +527,7 @@ export function renderJobOverviews(container: HTMLDivElement, overviews: JobOver
     // Add Show HTML button if rawHtml exists
     if (rawHtml) {
       const showHtmlButton = document.createElement('button');
-      showHtmlButton.textContent = 'Show HTML';
+      showHtmlButton.textContent = 'Show Details';
       showHtmlButton.style.padding = '4px 8px';
       showHtmlButton.style.backgroundColor = '#9e9e9e';
       showHtmlButton.style.color = 'white';

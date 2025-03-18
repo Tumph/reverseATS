@@ -268,49 +268,66 @@ export async function fetchAllJobOverviews(
     
     // Process jobs in batches to avoid overwhelming the server
     const results: JobOverview[] = [];
-    const batchSize = 5; // Smaller batch size for API calls
     let completedJobs = 0;
+    const parallelBatchSize = 8; // Process 8 requests in parallel
     
-    for (let i = 0; i < jobIds.length; i += batchSize) {
-      const batch = jobIds.slice(i, i + batchSize);
-      const batchNumber = Math.floor(i/batchSize) + 1;
-      const totalBatches = Math.ceil(jobIds.length/batchSize);
+    // Split all job IDs into batches
+    for (let i = 0; i < jobIds.length; i += parallelBatchSize) {
+      const batch = jobIds.slice(i, i + parallelBatchSize);
+      const batchNumber = Math.floor(i/parallelBatchSize) + 1;
+      const totalBatches = Math.ceil(jobIds.length/parallelBatchSize);
       
-      console.log(`Processing overview batch ${batchNumber} of ${totalBatches}`);
+      console.log(`Processing overview batch ${batchNumber} of ${totalBatches} (${batch.length} jobs in parallel)`);
       if (progressCallback) {
         progressCallback(
           (i / jobIds.length) * 100, 
-          `Processing batch ${batchNumber} of ${totalBatches}...`
+          `Processing batch ${batchNumber} of ${totalBatches} (${batch.length} jobs in parallel)...`
         );
       }
       
-      // Process each job in the batch sequentially
-      for (const jobId of batch) {
+      // Process all jobs in the current batch in parallel
+      const batchPromises = batch.map(async (jobId) => {
         console.log(`Fetching overview for job ${jobId}...`);
-        const html = await fetchJobOverview(jobId, actionToken);
-        
-        if (html) {
-          const overview = parseJobOverview(html);
-          // Store the raw HTML along with the parsed overview
-          results.push({ 
-            jobId, 
-            overview, 
-            rawHtml: html 
-          });
+        try {
+          const html = await fetchJobOverview(jobId, actionToken);
+          
+          if (html) {
+            const overview = parseJobOverview(html);
+            return { 
+              jobId, 
+              overview, 
+              rawHtml: html 
+            };
+          }
+        } catch (error) {
+          console.error(`Error fetching job ${jobId}:`, error);
         }
-        
-        // Update progress after each job
-        completedJobs++;
-        if (progressCallback) {
-          const jobProgress = (completedJobs / jobIds.length) * 100;
-          progressCallback(
-            jobProgress, 
-            `Fetched ${completedJobs} of ${jobIds.length} job overviews (${Math.round(jobProgress)}%)`
-          );
+        return null;
+      });
+      
+      // Wait for all parallel requests in this batch to complete
+      const batchResults = await Promise.all(batchPromises);
+      
+      // Filter out null results and add to the results array
+      batchResults.filter(result => result !== null).forEach(result => {
+        if (result) {
+          results.push(result);
         }
-        
-        // Add a small delay between requests
-        await new Promise(resolve => setTimeout(resolve, 500));
+      });
+      
+      // Update progress after the batch completes
+      completedJobs += batch.length;
+      if (progressCallback) {
+        const jobProgress = Math.min((completedJobs / jobIds.length) * 100, 99); // Cap at 99% until fully complete
+        progressCallback(
+          jobProgress, 
+          `Fetched ${results.length} of ${jobIds.length} job overviews (${Math.round(jobProgress)}%)`
+        );
+      }
+      
+      // Add a small delay between batches to avoid overwhelming the server
+      if (i + parallelBatchSize < jobIds.length) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
     

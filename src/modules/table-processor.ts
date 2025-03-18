@@ -13,7 +13,7 @@ import {
 } from './dom-utils';
 
 import { fetchAllJobOverviews } from './scraper';
-import { JobDetails } from './types';
+import { JobDetails, JobOverview } from './types';
 
 /**
  * Adds TR counter and buttons above WaterlooWorks tables
@@ -61,6 +61,15 @@ export function addTrCounterAndButton(): void {
     
     // Create loading indicator
     const loadingIndicator = createLoadingIndicator();
+    
+    // Check if there are already stored job overviews in Chrome storage
+    chrome.storage.local.get(['jobOverviews'], (result) => {
+      if (result.jobOverviews && Array.isArray(result.jobOverviews) && result.jobOverviews.length > 0) {
+        console.log('Found stored job overviews:', result.jobOverviews.length);
+        // Render the stored job overviews
+        renderJobOverviews(jobDetailsDisplay, result.jobOverviews);
+      }
+    });
     
     // Add click event to the fetch job overviews button
     fetchOverviewsButton.addEventListener('click', async () => {

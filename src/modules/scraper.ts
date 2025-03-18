@@ -266,10 +266,32 @@ export async function fetchAllJobOverviews(
       throw new Error('Failed to extract action token');
     }
     
+    // Setup for smooth progress updates
+    let lastProgressUpdate = Date.now();
+    let currentProgress = 0;
+    const updateProgressSmooth = (progress: number, message: string) => {
+      if (!progressCallback) return;
+      
+      // Limit updates to be at least 60ms apart for smooth animation
+      const now = Date.now();
+      if (now - lastProgressUpdate > 60 || progress >= 99) {
+        progressCallback(progress, message);
+        lastProgressUpdate = now;
+        currentProgress = progress;
+      }
+    };
+    
     // Process jobs in batches to avoid overwhelming the server
     const results: JobOverview[] = [];
     let completedJobs = 0;
-    const parallelBatchSize = 8; // Process 8 requests in parallel
+    const parallelBatchSize = 12; // Process 12 requests in parallel (increased from 8)
+    
+    // Function to get a progress value from 0-100 based on completed jobs
+    const getProgressValue = (complete: number, total: number, fakeIncrement = 0) => {
+      // Calculate real progress, but cap at 99% until fully complete
+      const realProgress = (complete / total) * 100;
+      return Math.min(realProgress + fakeIncrement, 99);
+    };
     
     // Split all job IDs into batches
     for (let i = 0; i < jobIds.length; i += parallelBatchSize) {
@@ -278,18 +300,32 @@ export async function fetchAllJobOverviews(
       const totalBatches = Math.ceil(jobIds.length/parallelBatchSize);
       
       console.log(`Processing overview batch ${batchNumber} of ${totalBatches} (${batch.length} jobs in parallel)`);
-      if (progressCallback) {
-        progressCallback(
-          (i / jobIds.length) * 100, 
-          `Processing batch ${batchNumber} of ${totalBatches} (${batch.length} jobs in parallel)...`
-        );
-      }
+      updateProgressSmooth(
+        getProgressValue(completedJobs, jobIds.length),
+        `Processing batch ${batchNumber} of ${totalBatches} (${batch.length} jobs in parallel)...`
+      );
+      
+      // Set up an array to track completions for this batch
+      let batchCompletions = 0;
       
       // Process all jobs in the current batch in parallel
       const batchPromises = batch.map(async (jobId) => {
         console.log(`Fetching overview for job ${jobId}...`);
         try {
           const html = await fetchJobOverview(jobId, actionToken);
+          
+          // Update progress smoothly to show incremental completions within a batch
+          batchCompletions++;
+          const batchProgress = batchCompletions / batch.length;
+          const overallProgress = getProgressValue(
+            completedJobs + (batchCompletions / batch.length) * batch.length, 
+            jobIds.length
+          );
+          
+          updateProgressSmooth(
+            overallProgress,
+            `Fetching job overviews... (${completedJobs + batchCompletions} of ${jobIds.length})`
+          );
           
           if (html) {
             const overview = parseJobOverview(html);
@@ -317,20 +353,34 @@ export async function fetchAllJobOverviews(
       
       // Update progress after the batch completes
       completedJobs += batch.length;
-      if (progressCallback) {
-        const jobProgress = Math.min((completedJobs / jobIds.length) * 100, 99); // Cap at 99% until fully complete
-        progressCallback(
-          jobProgress, 
-          `Fetched ${results.length} of ${jobIds.length} job overviews (${Math.round(jobProgress)}%)`
-        );
-      }
+      updateProgressSmooth(
+        getProgressValue(completedJobs, jobIds.length),
+        `Fetched ${results.length} of approximately ${jobIds.length} job overviews`
+      );
       
       // Add a small delay between batches to avoid overwhelming the server
       if (i + parallelBatchSize < jobIds.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Small micro-updates during the delay to make progress bar appear smoother
+        const delayStart = Date.now();
+        const totalDelay = 1000; // 1 second delay
+        const updateInterval = 150; // Update every 150ms during delay
+        
+        while (Date.now() - delayStart < totalDelay) {
+          const delayElapsed = Date.now() - delayStart;
+          const delayProgress = delayElapsed / totalDelay;
+          const fakeIncrement = delayProgress * (100 / jobIds.length) * 0.5; // Small increment to show activity
+          
+          updateProgressSmooth(
+            getProgressValue(completedJobs, jobIds.length, fakeIncrement),
+            `Fetched ${results.length} job overviews so far... preparing next batch`
+          );
+          
+          await new Promise(resolve => setTimeout(resolve, updateInterval));
+        }
       }
     }
     
+    // Final progress update
     if (progressCallback) {
       progressCallback(100, `Completed! Fetched ${results.length} job overviews.`);
     }

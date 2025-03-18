@@ -228,7 +228,8 @@ export function createLoadingIndicator(): HTMLDivElement {
   progressBar.style.width = '0%';
   progressBar.style.height = '100%';
   progressBar.style.backgroundColor = '#fbbc05';
-  progressBar.style.transition = 'width 0.3s ease-in-out';
+  progressBar.style.transition = 'width 0.8s cubic-bezier(0.4, 0.0, 0.2, 1)';
+  progressBar.style.transformOrigin = 'left';
   progressContainer.appendChild(progressBar);
   
   loadingIndicator.appendChild(progressContainer);

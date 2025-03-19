@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReverseATS - Resume Manager</title>
+  <style>
+    body {
+      width: 480px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      padding: 16px;
+      margin: 0;
+      color: #333;
+      background-color: #f9f9f9;
+    }
+    h1 {
+      font-size: 20px;
+      margin-top: 0;
+      color: #1a73e8;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+    }
+    h1 svg {
+      margin-right: 10px;
+    }
+    .card {
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .input-group {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #444;
+    }
+    .file-input {
+      width: 100%;
+      padding: 10px 0;
+    }
+    .file-info {
+      background-color: #f0f8ff;
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      display: none;
+    }
+    .file-info-item {
+      margin-bottom: 6px;
+    }
+    #resumeText {
+      width: 100%;
+      height: 250px;
+      padding: 12px;
+      box-sizing: border-box;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 14px;
+      resize: vertical;
+      line-height: 1.4;
+    }
+    .actions {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 16px;
+    }
+    button {
+      background-color: #1a73e8;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 14px;
+      transition: background-color 0.2s;
+    }
+    button:hover {
+      background-color: #0d62d1;
+    }
+    button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+    #clearBtn {
+      background-color: #f1f3f4;
+      color: #444;
+    }
+    #clearBtn:hover {
+      background-color: #e8eaed;
+    }
+    #status {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 4px;
+      font-size: 14px;
+      display: none;
+    }
+    .success {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .error {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .info {
+      background-color: #e1f5fe;
+      color: #0277bd;
+      border: 1px solid #b3e5fc;
+    }
+    .warning {
+      background-color: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeeba;
+    }
+    .footer {
+      margin-top: 16px;
+      font-size: 12px;
+      color: #666;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#1a73e8">
+      <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/>
+      <path d="M7 12h2v5H7v-5zm0-5h2v2H7V7zm4 0h2v2h-2V7zm0 5h2v5h-2v-5zm4-5h2v2h-2V7zm0 5h2v5h-2v-5z"/>
+    </svg>
+    ReverseATS - Resume Manager
+  </h1>
+  
+  <div id="resumeStatus" class="warning" style="margin-bottom: 16px; padding: 12px; border-radius: 4px; display: none;">
+    Please upload your resume to enable job matching
+  </div>
+  
+  <div class="card">
+    <div class="input-group">
+      <label for="resumeFile">Upload your resume (PDF only)</label>
+      <input type="file" id="resumeFile" class="file-input" accept=".pdf" />
+    </div>
+    
+    <div id="fileInfo" class="file-info"></div>
+    
+    <div class="input-group">
+      <label for="resumeText">Extracted Resume Text (you can edit this)</label>
+      <textarea id="resumeText" placeholder="Your resume text will appear here after upload. You can edit it to optimize keyword matching."></textarea>
+    </div>
+    
+    <div class="actions">
+      <button id="clearBtn">Clear</button>
+      <button id="saveBtn" disabled>Save Resume</button>
+    </div>
+  </div>
+  
+  <div id="status"></div>
+  
+  <div class="footer">
+    After saving your resume, visit WaterlooWorks job listings to see match percentages for each job.
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html> 

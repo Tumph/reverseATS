@@ -1,11 +1,22 @@
 {
   "manifest_version": 3,
-  "name": "WaterlooWorks TR Counter",
+  "name": "ReverseATS Job Matcher",
   "version": "1.0",
-  "description": "Counts and displays the number of table rows on WaterlooWorks job page",
+  "description": "Match your resume to job postings with cosine similarity analysis",
   "icons": {
     "48": "image48.png",
     "128": "image128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "48": "image48.png",
+      "128": "image128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
   },
   "content_scripts": [
     {

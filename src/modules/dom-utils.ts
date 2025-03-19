@@ -1,6 +1,8 @@
 // DOM utility functions
 
-import {JobOverview } from './types';
+import {JobOverview, JobDetails } from './types';
+import { calculateJobResumeMatch, formatSimilarityScore, extractJobDescription } from './similarity';
+import { injectMatchPercentagesIntoTable } from './table-injector';
 
 /**
  * Creates a styled container for displaying information
@@ -129,7 +131,6 @@ function showExtensionDescription(): void {
       <li><strong>TR Counter:</strong> Counts the number of table rows (jobs) on the page</li>
       <li><strong>Job ID Extraction:</strong> Extracts and displays all job IDs from the table</li>
       <li><strong>Job Overview Fetching:</strong> Extracts detailed overview information about each job</li>
-      <li><strong>Data Export:</strong> Allows you to download job overviews as JSON or CSV</li>
     </ul>
     <h3>How to Use</h3>
     <ol>
@@ -162,21 +163,41 @@ function showExtensionDescription(): void {
 }
 
 /**
- * Creates a fetch job overviews button element
- * @returns The created fetch job overviews button element
+ * Creates a button to fetch job overviews
  */
 export function createFetchOverviewsButton(): HTMLButtonElement {
-  const fetchOverviewsButton = document.createElement('button');
-  fetchOverviewsButton.textContent = 'Fetch Job Overviews';
-  fetchOverviewsButton.style.padding = '5px 10px';
-  fetchOverviewsButton.style.backgroundColor = '#fbbc05';
-  fetchOverviewsButton.style.color = 'white';
-  fetchOverviewsButton.style.border = 'none';
-  fetchOverviewsButton.style.borderRadius = '3px';
-  fetchOverviewsButton.style.cursor = 'pointer';
-  fetchOverviewsButton.style.marginLeft = '10px';
+  const button = document.createElement('button');
+  button.textContent = 'Fetch Job Overviews';
+  button.style.backgroundColor = '#1a73e8';
+  button.style.color = 'white';
+  button.style.border = 'none';
+  button.style.borderRadius = '4px';
+  button.style.padding = '8px 16px';
+  button.style.marginRight = '10px';
+  button.style.cursor = 'pointer';
+  button.style.fontSize = '14px';
   
-  return fetchOverviewsButton;
+  // Check if resume exists in storage
+  chrome.storage.local.get(['resumeText'], (result) => {
+    if (!result.resumeText) {
+      // Disable button if no resume is available
+      button.disabled = true;
+      button.style.backgroundColor = '#ccc';
+      button.style.cursor = 'not-allowed';
+      button.title = 'Upload a resume first to enable job matching';
+      button.textContent = 'Upload Resume First';
+      
+      // Send message to background script to open popup
+      chrome.runtime.sendMessage({ action: 'openPopup' });
+      
+      // Add click handler to still open popup when clicked
+      button.addEventListener('click', () => {
+        chrome.runtime.sendMessage({ action: 'openPopup' });
+      });
+    }
+  });
+  
+  return button;
 }
 
 /**
@@ -438,7 +459,7 @@ function showHtmlPopup(rawHtml: string, jobId: string): void {
  * @param container The job details display element
  * @param overviews The job overviews to render
  */
-export function renderJobOverviews(container: HTMLDivElement, overviews: JobOverview[]): void {
+export async function renderJobOverviews(container: HTMLDivElement, overviews: JobOverview[]): Promise<void> {
   // Clear previous content
   container.innerHTML = '';
   container.style.display = 'block';
@@ -449,214 +470,214 @@ export function renderJobOverviews(container: HTMLDivElement, overviews: JobOver
     container.appendChild(noDetailsMessage);
     return;
   }
-  
-  // Create a container for the job overviews
-  const overviewsContainer = document.createElement('div');
-  overviewsContainer.style.maxHeight = '500px';
-  overviewsContainer.style.overflowY = 'auto';
-  overviewsContainer.style.border = '1px solid #ddd';
-  overviewsContainer.style.borderRadius = '5px';
-  overviewsContainer.style.padding = '10px';
-  
-  // Show the number of jobs fetched
-  const statsMessage = document.createElement('p');
-  statsMessage.textContent = `Fetched overviews for ${overviews.length} jobs.`;
-  statsMessage.style.marginBottom = '15px';
-  statsMessage.style.fontWeight = 'bold';
-  overviewsContainer.appendChild(statsMessage);
-  
-  // Create a container for action buttons
-  const actionsContainer = document.createElement('div');
-  actionsContainer.style.marginBottom = '15px';
-  actionsContainer.style.display = 'flex';
-  actionsContainer.style.gap = '10px';
-  
-  // Add download as JSON button
-  const downloadJsonButton = document.createElement('button');
-  downloadJsonButton.textContent = 'Download as JSON';
-  downloadJsonButton.style.padding = '5px 10px';
-  downloadJsonButton.style.backgroundColor = '#4285f4';
-  downloadJsonButton.style.color = 'white';
-  downloadJsonButton.style.border = 'none';
-  downloadJsonButton.style.borderRadius = '3px';
-  downloadJsonButton.style.cursor = 'pointer';
-  downloadJsonButton.addEventListener('click', () => {
-    downloadAsJson(overviews, 'job_overviews.json');
-  });
-  actionsContainer.appendChild(downloadJsonButton);
-  
-  // Add download as CSV button
-  const downloadCsvButton = document.createElement('button');
-  downloadCsvButton.textContent = 'Download as CSV';
-  downloadCsvButton.style.padding = '5px 10px';
-  downloadCsvButton.style.backgroundColor = '#34a853';
-  downloadCsvButton.style.color = 'white';
-  downloadCsvButton.style.border = 'none';
-  downloadCsvButton.style.borderRadius = '3px';
-  downloadCsvButton.style.cursor = 'pointer';
-  downloadCsvButton.addEventListener('click', () => {
-    downloadAsCsv(overviews, 'job_overviews.csv');
-  });
-  actionsContainer.appendChild(downloadCsvButton);
-  
-  // Add to container
-  overviewsContainer.appendChild(actionsContainer);
-  
-  // Create a job overview cards
-  for (const { jobId, overview, rawHtml } of overviews) {
-    const jobCard = document.createElement('div');
-    jobCard.style.border = '1px solid #ddd';
-    jobCard.style.borderRadius = '5px';
-    jobCard.style.padding = '10px';
-    jobCard.style.marginBottom = '15px';
-    
-    // Create header container with job ID and Show HTML button
-    const headerContainer = document.createElement('div');
-    headerContainer.style.display = 'flex';
-    headerContainer.style.justifyContent = 'space-between';
-    headerContainer.style.alignItems = 'center';
-    headerContainer.style.marginBottom = '10px';
-    
-    // Job ID as header
-    const jobIdHeader = document.createElement('h3');
-    jobIdHeader.textContent = `Job ID: ${jobId}`;
-    jobIdHeader.style.margin = '0';
-    jobIdHeader.style.color = '#4285f4';
-    headerContainer.appendChild(jobIdHeader);
-    
-    // Add Show HTML button if rawHtml exists
-    if (rawHtml) {
-      const showHtmlButton = document.createElement('button');
-      showHtmlButton.textContent = 'Show Details';
-      showHtmlButton.style.padding = '4px 8px';
-      showHtmlButton.style.backgroundColor = '#9e9e9e';
-      showHtmlButton.style.color = 'white';
-      showHtmlButton.style.border = 'none';
-      showHtmlButton.style.borderRadius = '3px';
-      showHtmlButton.style.cursor = 'pointer';
-      showHtmlButton.style.fontSize = '12px';
-      
-      // Add click event to show HTML popup
-      showHtmlButton.addEventListener('click', () => {
-        showHtmlPopup(rawHtml, jobId);
-      });
-      
-      headerContainer.appendChild(showHtmlButton);
-    }
-    
-    jobCard.appendChild(headerContainer);
-    
-    // Job Title if available
-    if (overview['Job Title']) {
-      const jobTitle = document.createElement('h4');
-      jobTitle.textContent = overview['Job Title'];
-      jobTitle.style.margin = '0 0 10px 0';
-      jobCard.appendChild(jobTitle);
-    }
-    
-    // Create a details table
-    const detailsTable = document.createElement('table');
-    detailsTable.style.width = '100%';
-    detailsTable.style.borderCollapse = 'collapse';
-    
-    // Add all overview fields
-    for (const [key, value] of Object.entries(overview)) {
-      // Skip job title as it's already displayed as header
-      if (key === 'Job Title') continue;
-      
-      const row = document.createElement('tr');
-      
-      const keyCell = document.createElement('td');
-      keyCell.textContent = key;
-      keyCell.style.padding = '5px';
-      keyCell.style.borderBottom = '1px solid #eee';
-      keyCell.style.fontWeight = 'bold';
-      keyCell.style.width = '30%';
-      row.appendChild(keyCell);
-      
-      const valueCell = document.createElement('td');
-      valueCell.textContent = value;
-      valueCell.style.padding = '5px';
-      valueCell.style.borderBottom = '1px solid #eee';
-      valueCell.style.width = '70%';
-      row.appendChild(valueCell);
-      
-      detailsTable.appendChild(row);
-    }
-    
-    jobCard.appendChild(detailsTable);
-    overviewsContainer.appendChild(jobCard);
-  }
-  
-  // Add to main container
-  container.appendChild(overviewsContainer);
-}
 
-/**
- * Downloads the given data as a JSON file
- * @param data The data to download
- * @param filename The name of the file
- */
-function downloadAsJson(data: any, filename: string): void {
-  const json = JSON.stringify(data, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  
-  URL.revokeObjectURL(url);
-}
-
-/**
- * Downloads the given data as a CSV file
- * @param overviews The job overviews to download
- * @param filename The name of the file
- */
-function downloadAsCsv(overviews: JobOverview[], filename: string): void {
-  // Get all unique keys from all overviews
-  const allKeys = new Set<string>();
-  allKeys.add('JobId'); // Always include JobId
-  
-  overviews.forEach(({ overview }) => {
-    Object.keys(overview).forEach(key => allKeys.add(key));
-  });
-  
-  // Convert to array and sort
-  const headers = Array.from(allKeys);
-  
-  // Create CSV content
-  let csv = headers.join(',') + '\n';
-  
-  overviews.forEach(({ jobId, overview }) => {
-    const row = headers.map(header => {
-      if (header === 'JobId') return jobId;
-      
-      // Get value for this header, or empty string if not present
-      let value = overview[header] || '';
-      
-      // Escape quotes and wrap in quotes if contains comma or newline
-      if (value.includes('"')) value = value.replace(/"/g, '""');
-      if (value.includes(',') || value.includes('\n') || value.includes('"')) {
-        value = `"${value}"`;
-      }
-      
-      return value;
+  // Get the processed resume text for matching
+  chrome.storage.local.get(['resumeText'], async (result) => {
+    const hasResume = !!result.resumeText;
+    let resumeText = result.resumeText || '';
+    
+    console.log('Resume storage check:', { 
+      hasResume, 
+      hasProcessedText: !!resumeText,
+      processedTextLength: resumeText.length
     });
     
-    csv += row.join(',') + '\n';
+    // Calculate all match scores at once and save them
+    const jobMatches: Array<{jobId: string, score: number}> = [];
+    if (hasResume && resumeText) {
+      // Process all match scores in parallel
+      const matchPromises = overviews.map(async ({ jobId, overview }) => {
+        try {
+          // Extract job description text for matching
+          const jobDescriptionText = overview['overview'] || '';
+          
+          // Calculate similarity
+          const score = await calculateJobResumeMatch(jobDescriptionText, resumeText);
+          return { jobId, score };
+        } catch (error) {
+          console.error(`Error calculating similarity for job ${jobId}:`, error);
+          return { jobId, score: 0 };
+        }
+      });
+      
+      // Wait for all match calculations to complete
+      const results = await Promise.all(matchPromises);
+      jobMatches.push(...results);
+      
+      // Save job matches to chrome.storage.local
+      chrome.storage.local.set({ jobMatches }, () => {
+        console.log('Job matches saved to chrome.storage.local:', jobMatches.length);
+      });
+      
+      // Import table injector and inject match percentages
+      try {
+        injectMatchPercentagesIntoTable(overviews);
+      } catch (error) {
+        console.error('Error injecting match percentages:', error);
+      }
+    }
+    
+    // Create a container for the job overviews
+    const overviewsContainer = document.createElement('div');
+    overviewsContainer.style.maxHeight = '500px';
+    overviewsContainer.style.overflowY = 'auto';
+    overviewsContainer.style.border = '1px solid #ddd';
+    overviewsContainer.style.borderRadius = '5px';
+    overviewsContainer.style.padding = '10px';
+    
+    // Show the number of jobs fetched
+    const statsMessage = document.createElement('p');
+    statsMessage.textContent = `Fetched overviews for ${overviews.length} jobs.`;
+    if (!hasResume) {
+      statsMessage.textContent += ' Upload a resume to see match percentages.';
+      statsMessage.style.color = '#856404';
+    }
+    statsMessage.style.marginBottom = '15px';
+    statsMessage.style.fontWeight = 'bold';
+    overviewsContainer.appendChild(statsMessage);
+    
+    // Create a container for action buttons
+    const actionsContainer = document.createElement('div');
+    actionsContainer.style.marginBottom = '15px';
+    actionsContainer.style.display = 'flex';
+    actionsContainer.style.gap = '10px';
+  
+    // Process job overviews
+    const processOverviews = async () => {
+      // Create a job overview cards
+      for (const { jobId, overview, rawHtml } of overviews) {
+        const jobCard = document.createElement('div');
+        jobCard.style.border = '1px solid #ddd';
+        jobCard.style.borderRadius = '5px';
+        jobCard.style.padding = '10px';
+        jobCard.style.marginBottom = '15px';
+        
+        // Create header container with job ID and Show HTML button
+        const headerContainer = document.createElement('div');
+        headerContainer.style.display = 'flex';
+        headerContainer.style.justifyContent = 'space-between';
+        headerContainer.style.alignItems = 'center';
+        headerContainer.style.marginBottom = '10px';
+        
+        // Job ID as header
+        const jobIdHeader = document.createElement('h3');
+        jobIdHeader.textContent = `Job ID: ${jobId}`;
+        jobIdHeader.style.margin = '0';
+        jobIdHeader.style.color = '#4285f4';
+        headerContainer.appendChild(jobIdHeader);
+        
+        // Container for match score and button
+        const scoreButtonContainer = document.createElement('div');
+        scoreButtonContainer.style.display = 'flex';
+        scoreButtonContainer.style.alignItems = 'center';
+        scoreButtonContainer.style.gap = '10px';
+        
+        // Display match score if available
+        if (hasResume && resumeText) {
+          // Find the match score from our precalculated matches
+          const matchInfo = jobMatches.find(match => match.jobId === jobId);
+          if (matchInfo) {
+            const { score, color } = formatSimilarityScore(matchInfo.score);
+            
+            // Create match score element
+            const matchScoreElement = document.createElement('div');
+            matchScoreElement.textContent = score;
+            matchScoreElement.style.fontSize = '14px';
+            matchScoreElement.style.fontWeight = 'bold';
+            matchScoreElement.style.color = color;
+            
+            scoreButtonContainer.appendChild(matchScoreElement);
+          }
+        }
+        
+        // Add Show HTML button if rawHtml exists
+        if (rawHtml) {
+          const showHtmlButton = document.createElement('button');
+          showHtmlButton.textContent = 'Show Details';
+          showHtmlButton.style.padding = '4px 8px';
+          showHtmlButton.style.backgroundColor = '#9e9e9e';
+          showHtmlButton.style.color = 'white';
+          showHtmlButton.style.border = 'none';
+          showHtmlButton.style.borderRadius = '3px';
+          showHtmlButton.style.cursor = 'pointer';
+          showHtmlButton.style.fontSize = '12px';
+          
+          // Add click event to show HTML popup
+          showHtmlButton.addEventListener('click', () => {
+            showHtmlPopup(rawHtml, jobId);
+          });
+          
+          scoreButtonContainer.appendChild(showHtmlButton);
+        }
+        
+        headerContainer.appendChild(scoreButtonContainer);
+        jobCard.appendChild(headerContainer);
+
+        
+        // Create a details table
+        const detailsTable = document.createElement('table');
+        detailsTable.style.width = '100%';
+        detailsTable.style.borderCollapse = 'collapse';
+        
+        // Add all overview fields with similarity score
+        for (const [key, value] of Object.entries(overview)) {
+          // Skip job title as it's already displayed as header, and skip overview as it's redundant with the overall match
+          if (key === 'Job Title' || key === 'overview') continue;
+          
+          const row = document.createElement('tr');
+          
+          // Create key cell
+          const keyCell = document.createElement('td');
+          keyCell.textContent = key;
+          keyCell.style.padding = '5px';
+          keyCell.style.borderBottom = '1px solid #eee';
+          keyCell.style.fontWeight = 'bold';
+          keyCell.style.width = '30%';
+          row.appendChild(keyCell);
+          
+          // Create value cell with similarity score instead of actual text
+          const valueCell = document.createElement('td');
+          valueCell.style.padding = '5px';
+          valueCell.style.borderBottom = '1px solid #eee';
+          valueCell.style.width = '70%';
+          
+          if (hasResume && resumeText && value) {
+            try {
+              // Calculate similarity (now async)
+              const similarity = await calculateJobResumeMatch(value, resumeText);
+              const { score, color } = formatSimilarityScore(similarity);
+              
+              // Display match percentage
+              valueCell.textContent = score;
+              valueCell.style.color = color;
+              
+            } catch (error) {
+              console.error(`Error calculating similarity for field ${key}:`, error);
+              valueCell.textContent = 'Error calculating match';
+              valueCell.style.color = '#dc3545';
+            }
+          } else {
+            // If no resume or empty field, show a placeholder
+            valueCell.textContent = 'No match available';
+            valueCell.style.color = '#6c757d';
+          }
+          
+          row.appendChild(valueCell);
+          detailsTable.appendChild(row);
+        }
+        
+        jobCard.appendChild(detailsTable);
+        overviewsContainer.appendChild(jobCard);
+      }
+      
+      // Add to main container
+      container.appendChild(overviewsContainer);
+    };
+    
+    // Execute the async processing
+    processOverviews().catch(error => {
+      console.error('Error processing job overviews:', error);
+      container.innerHTML = `<p style="color: red;">Error processing job overviews: ${error.message || 'Unknown error'}</p>`;
+    });
   });
-  
-  // Create blob and download
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  
-  URL.revokeObjectURL(url);
-} 
+}

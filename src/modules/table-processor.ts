@@ -63,17 +63,32 @@ export function addTrCounterAndButton(): void {
     const loadingIndicator = createLoadingIndicator();
     
     // Check if there are already stored job overviews in Chrome storage
-    chrome.storage.local.get(['jobOverviews'], (result) => {
+    chrome.storage.local.get(['jobOverviews'], async (result) => {
       if (result.jobOverviews && Array.isArray(result.jobOverviews) && result.jobOverviews.length > 0) {
         console.log('Found stored job overviews:', result.jobOverviews.length);
         // Render the stored job overviews
-        renderJobOverviews(jobDetailsDisplay, result.jobOverviews);
+        await renderJobOverviews(jobDetailsDisplay, result.jobOverviews);
       }
     });
     
     // Add click event to the fetch job overviews button
     fetchOverviewsButton.addEventListener('click', async () => {
       try {
+        // Check if resume exists first
+        const resumeResult = await new Promise<{resumeText?: string}>((resolve) => {
+          chrome.storage.local.get(['resumeText'], resolve);
+        });
+        
+        if (!resumeResult.resumeText) {
+          // Show error message if no resume
+          jobDetailsDisplay.style.display = 'block';
+          jobDetailsDisplay.innerHTML = `
+            <p style="color: #856404; background-color: #fff3cd; padding: 10px; border-radius: 4px; border: 1px solid #ffeeba;">
+              You need to add a resume first. Please click on the extension icon to upload your resume.
+            </p>`;
+          return;
+        }
+        
         // Reset and show loading indicator
         updateLoadingProgress(loadingIndicator, 0, 'Initializing job overview fetch...');
         loadingIndicator.style.display = 'block';
@@ -93,7 +108,7 @@ export function addTrCounterAndButton(): void {
         loadingIndicator.style.display = 'none';
         
         // Render job overviews
-        renderJobOverviews(jobDetailsDisplay, jobOverviews);
+        await renderJobOverviews(jobDetailsDisplay, jobOverviews);
         
         // Save job overviews to chrome.storage.local
         chrome.storage.local.set({ jobOverviews: jobOverviews }, () => {

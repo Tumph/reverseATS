@@ -52,14 +52,7 @@ function extractActionToken(): string | null {
       return match[1];
     }
     
-    // Fallback: try to find any action token pattern
-    const fallbackMatch = scriptText.match(/action:\s*'([^\']+)'/);
-    if (fallbackMatch && fallbackMatch[1]) {
-      console.log('Extracted fallback action token:', fallbackMatch[1]);
-      return fallbackMatch[1];
-    }
-    
-    console.error('Action token not found');
+    console.error('Action token not found - please report this error to aryansmail@gmail.com');
     return null;
   } catch (error) {
     console.error('Error extracting action token:', error);
@@ -101,145 +94,53 @@ export async function fetchJobOverview(jobId: string, actionToken: string): Prom
 }
 
 /**
- * Processes and extracts key information from job overview HTML
+ * Processes and extracts text from job overview HTML without labeling
  * @param {string} html - HTML content of the job overview
- * @returns {object} - Object containing extracted job overview data
+ * @returns {object} - Object containing job title and full text content
  */
 export function parseJobOverview(html: string): Record<string, string> {
   try {
+    console.log('Parsing job overview HTML to plain text, length:', html.length);
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
     
-    // Extract key fields - adjust selectors based on actual HTML structure
+    // Create a basic overview object with minimal structure
     const overview: Record<string, string> = {};
     
-    // Try to get the job title first
+    // Extract job title separately as it's useful for display
     const jobTitle = doc.querySelector('.heading--banner');
-    if (jobTitle) {
-      overview['Job Title'] = jobTitle.textContent?.trim() || '';
+    if (jobTitle && jobTitle.textContent) {
+      overview['Job Title'] = jobTitle.textContent.trim().replace(/TAGS/i, '').trim();
+    } else {
+      overview['Job Title'] = 'Unknown Job Title';
     }
     
-    // Common job information fields - check for table with job details
-    const jobInfoSection = doc.querySelector('.orbis-posting-information, .job-information-table');
-    if (jobInfoSection) {
-      const rows = jobInfoSection.querySelectorAll('tr');
-      rows.forEach(row => {
-        const label = row.querySelector('th')?.textContent?.trim();
-        const value = row.querySelector('td')?.textContent?.trim();
-        if (label && value) {
-          overview[label] = value;
-        }
-      });
-    }
+    // Convert the entire HTML content to text
+    // Remove script and style elements first to clean up the content
+    const scripts = doc.querySelectorAll('script, style');
+    scripts.forEach(script => script.remove());
     
-    // Job description section - look for different possible selectors
-    const jobDescriptionSection = doc.querySelector('.orbis-posting-description, .job-description-container');
-    if (jobDescriptionSection) {
-      // Try to find card structure first
-      const sections = jobDescriptionSection.querySelectorAll('div.card, .job-description-card');
-      
-      if (sections.length > 0) {
-        sections.forEach(section => {
-          const title = section.querySelector('.card-header, .description-header')?.textContent?.trim();
-          const content = section.querySelector('.card-body, .description-content')?.textContent?.trim();
-          if (title && content) {
-            overview[title] = content;
-          }
-        });
-      } else {
-        // If no card structure, try other common patterns
-        const descriptionBlocks = jobDescriptionSection.querySelectorAll('div[class*="description"], div[class*="posting-field"], .description-text');
-        
-        descriptionBlocks.forEach(block => {
-          // Get title from heading or attribute
-          let title = block.querySelector('h1, h2, h3, h4, h5, h6')?.textContent?.trim();
-          
-          // If no title found, try using a data attribute or class name
-          if (!title) {
-            const className = Array.from(block.classList).find(c => 
-              c.includes('description') || c.includes('field') || c.includes('posting')
-            );
-            title = className ? className.replace(/-/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2') : 'Description';
-          }
-          
-          // Get content by removing any title/heading elements and getting remaining text
-          const contentNodes = Array.from(block.childNodes).filter(node => 
-            !(node.nodeType === 1 && 
-              ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'HEADER'].includes((node as Element).tagName))
-          );
-          
-          let content = '';
-          contentNodes.forEach(node => {
-            if (node.nodeType === 1) { // Element node
-              content += (node as Element).textContent?.trim() + '\n';
-            } else if (node.nodeType === 3) { // Text node
-              const text = (node as Text).textContent?.trim();
-              if (text) content += text + '\n';
-            }
-          });
-          
-          if (title && content.trim()) {
-            overview[title] = content.trim();
-          }
-        });
-      }
-    }
+    // Get all text content from the document body
+    const textContent = doc.body.textContent || '';
     
-    // If structured parsing fails, try to extract any visible text content by section
-    if (Object.keys(overview).length === 0) {
-      // Find main content areas
-      const mainContent = doc.querySelector('main, .main-content, #content, body');
-      
-      if (mainContent) {
-        // Job title might be in a heading
-        const title = mainContent.querySelector('h1, h2, .job-title, .heading')?.textContent?.trim();
-        if (title) {
-          overview['Job Title'] = title;
-        }
-        
-        // Try to find paragraphs or text blocks
-        const paragraphs = mainContent.querySelectorAll('p, .text-block, div[class*="description"]');
-        if (paragraphs.length > 0) {
-          let description = '';
-          paragraphs.forEach(p => {
-            const text = p.textContent?.trim();
-            if (text) description += text + '\n\n';
-          });
-          
-          if (description) {
-            overview['Job Description'] = description.trim();
-          }
-        }
-        
-        // If still no content, just grab all text
-        if (Object.keys(overview).length === 0 || 
-            (Object.keys(overview).length === 1 && overview['Job Title'])) {
-          overview['Full Content'] = mainContent.textContent?.trim() || 'No content found';
-        }
-      } else {
-        // Last resort - get body text
-        overview['Content'] = doc.body.textContent?.trim() || 'No content found';
-      }
-    }
+    // Clean up the text content (remove excessive whitespace)
+    const cleanText = textContent
+      .replace(/\s+/g, ' ')
+      .trim();
     
-    // Process and clean up the extracted data
-    const cleanedOverview: Record<string, string> = {};
-    Object.entries(overview).forEach(([key, value]) => {
-      // Clean up whitespace and normalize line breaks
-      const cleanedValue = value
-        .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-        .replace(/\n\s*\n/g, '\n\n') // Normalize multiple line breaks
-        .trim();
-      
-      if (cleanedValue) {
-        cleanedOverview[key] = cleanedValue;
-      }
-    });
+    // Store the full text for matching (without labels)
+    overview['overview'] = cleanText;
     
-    return cleanedOverview;
+    console.log('Extracted plain text length:', cleanText.length);
+    console.log('Text sample:', cleanText.substring(0, 100) + '...');
+    
+    return overview;
   } catch (error) {
     console.error('Error parsing job overview HTML:', error);
-    return { 'Error': 'Failed to parse job overview', 'Raw Content': html.substring(0, 500) + '...' };
+    return { 
+      'Job Title': 'Error Parsing Job',
+      'overview': 'Failed to parse job data'
+    };
   }
 }
 
@@ -299,7 +200,6 @@ export async function fetchAllJobOverviews(
       const batchNumber = Math.floor(i/parallelBatchSize) + 1;
       const totalBatches = Math.ceil(jobIds.length/parallelBatchSize);
       
-      console.log(`Processing overview batch ${batchNumber} of ${totalBatches} (${batch.length} jobs in parallel)`);
       updateProgressSmooth(
         getProgressValue(completedJobs, jobIds.length),
         `Processing batch ${batchNumber} of ${totalBatches} (${batch.length} jobs in parallel)...`

@@ -11,6 +11,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
+////
+//chrome.action.openPopup(); for if you want a popup not a new tab
+////
 // Check for first install or update
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
@@ -25,7 +28,7 @@ chrome.action.onClicked.addListener(() => {
   chrome.storage.local.get(['resumeText'], (result) => {
     if (!result.resumeText) {
       // If no resume, open the popup
-      chrome.action.openPopup();
+      chrome.tabs.create({ url: 'popup.html' });
     }
   });
 });

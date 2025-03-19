@@ -43,7 +43,6 @@ export async function extractTextFromPdf(arrayBuffer: ArrayBuffer): Promise<stri
     
     return cleanedText;
   } catch (error) {
-    console.error('Error extracting text from PDF:', error);
     throw new Error(`PDF extraction failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
@@ -78,7 +77,6 @@ export async function extractPdfMetadata(arrayBuffer: ArrayBuffer): Promise<Reco
       pageCount: pdf.numPages
     };
   } catch (error) {
-    console.error('Error extracting PDF metadata:', error);
     return {};
   }
 }
@@ -99,7 +97,6 @@ export async function getPdfPageCount(arrayBuffer: ArrayBuffer): Promise<number>
     
     return pdf.numPages;
   } catch (error) {
-    console.error('Error getting PDF page count:', error);
     return 0;
   }
 } 

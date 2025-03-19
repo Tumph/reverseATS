@@ -1,7 +1,6 @@
 // Import required dependencies
-import axios from 'axios';
 import $ from 'jquery';
-import { JobDetails, JobOverview } from './types';
+import {JobOverview } from './types';
 
 /**
  * Scrapes all job IDs from the current page
@@ -10,8 +9,11 @@ import { JobDetails, JobOverview } from './types';
 export function scrapeJobIds(): string[] {
   const jobIds: string[] = [];
   
+  
   // Method 1: Find job IDs from input elements with ID pattern
-  $('input[id^="resultRow_"]').each(function() {
+  const inputElements = $('input[id^="resultRow_"]');
+  
+  inputElements.each(function() {
     const idAttr = $(this).attr('id');
     if (idAttr) {
       const jobId = idAttr.replace('resultRow_', '');
@@ -23,11 +25,51 @@ export function scrapeJobIds(): string[] {
   
   // Method 2: Find job IDs from table cells (as backup)
   if (jobIds.length === 0) {
-    $('.table__row--body').each(function() {
-      // The job ID is in the first td element of each row
-      const jobId = $(this).find('td:eq(0)').text().trim();
+    
+    // Determine if match column has been added to get the correct job ID column index
+    let jobIdColumnIndex = 0; // Default to first column
+    
+    // Check if the match column has been added by looking for our custom attribute
+    const matchColumnExists = document.querySelector('th[data-match-column="true"]') !== null;
+    if (matchColumnExists) {
+      jobIdColumnIndex = 1; // If match column exists, job IDs are in the second column
+    }
+    
+    const tableRows = $('.table__row--body');
+    
+    tableRows.each(function() {
+      // Get the cell at the determined job ID column index
+      const jobIdCell = $(this).find(`td:eq(${jobIdColumnIndex})`);
+      const jobId = jobIdCell.text().trim();
+      
       if (jobId && !isNaN(Number(jobId)) && !jobIds.includes(jobId)) {
         jobIds.push(jobId);
+      }
+    });
+    
+    // If still no IDs found, try looking at the next column as a fallback
+    if (jobIds.length === 0 && jobIdColumnIndex === 0) {
+      tableRows.each(function() {
+        const jobIdCell = $(this).find('td:eq(1)');
+        const jobId = jobIdCell.text().trim();
+        
+        if (jobId && !isNaN(Number(jobId)) && !jobIds.includes(jobId)) {
+          jobIds.push(jobId);
+        }
+      });
+    }
+  }
+  
+  // Try a more direct approach if still no IDs found - scan all cells for 6-digit numbers
+  if (jobIds.length === 0) {
+    // Direct approach - find all TD elements that might contain job IDs
+    $('td').each(function() {
+      const text = $(this).text().trim();
+      // Only consider 6-digit numbers as potential job IDs
+      if (/^\d{6}$/.test(text)) {
+        if (!jobIds.includes(text)) {
+          jobIds.push(text);
+        }
       }
     });
   }
@@ -48,14 +90,11 @@ function extractActionToken(): string | null {
     // Extract the action token from the getPostingOverview function
     const match = scriptText.match(/getPostingOverview[^}]*action:\s*'([^\']+)'/);
     if (match && match[1]) {
-      console.log('Extracted action token:', match[1]);
       return match[1];
     }
     
-    console.error('Action token not found - please report this error to aryansmail@gmail.com');
     return null;
   } catch (error) {
-    console.error('Error extracting action token:', error);
     return null;
   }
 }
@@ -88,7 +127,6 @@ export async function fetchJobOverview(jobId: string, actionToken: string): Prom
     const html = await response.text();
     return html;
   } catch (error) {
-    console.error(`Error fetching overview for job ID ${jobId}:`, error);
     return null;
   }
 }
@@ -100,7 +138,6 @@ export async function fetchJobOverview(jobId: string, actionToken: string): Prom
  */
 export function parseJobOverview(html: string): Record<string, string> {
   try {
-    console.log('Parsing job overview HTML to plain text, length:', html.length);
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
     
@@ -131,12 +168,8 @@ export function parseJobOverview(html: string): Record<string, string> {
     // Store the full text for matching (without labels)
     overview['overview'] = cleanText;
     
-    console.log('Extracted plain text length:', cleanText.length);
-    console.log('Text sample:', cleanText.substring(0, 100) + '...');
-    
     return overview;
   } catch (error) {
-    console.error('Error parsing job overview HTML:', error);
     return { 
       'Job Title': 'Error Parsing Job',
       'overview': 'Failed to parse job data'
@@ -153,9 +186,81 @@ export async function fetchAllJobOverviews(
   progressCallback?: (progress: number, message: string) => void
 ): Promise<JobOverview[]> {
   try {
+    // Function to extract job IDs from current page
+    const extractJobIdsFromPage = () => {
+      const jobTable = document.querySelector('table[data-v-17eef081]');
+      
+      if (!jobTable) {
+        console.error('Job table not found');
+        return [];
+      }
+      
+      const jobIds: string[] = [];
+      
+      // Get pagination info to understand context
+      const paginationDiv = document.querySelector('div.table--view__pagination--data[data-v-17eef081]');
+      const resultsCountElement = paginationDiv?.querySelector('div.margin--r--s');
+      const resultsCount = resultsCountElement ? resultsCountElement.textContent?.trim() || '' : '';
+      
+      console.log('Current pagination info:', { 
+        resultsCount,
+        paginationFound: !!paginationDiv 
+      });
+      
+      // Find all rows in the job table
+      const rows = jobTable.querySelectorAll('tr.table__row--body');
+      console.log(`Found ${rows.length} rows in the table`);
+      
+      // Examine each row to find job IDs
+      rows.forEach((row, index) => {
+        try {
+          // Get all cells in the row
+          const cells = row.querySelectorAll('td');
+          
+          // Log a sample of rows for debugging
+          if (index < 3 || index > rows.length - 3) {
+            console.log(`Row ${index} has ${cells.length} cells`);
+          }
+          
+          // Skip rows with no cells
+          if (!cells || cells.length === 0) return;
+          
+          // IMPROVED: Find job ID by examining all cells for 6-digit numbers
+          // This is more reliable than assuming a specific column index
+          for (let i = 0; i < cells.length; i++) {
+            const cell = cells[i];
+            const text = cell.textContent?.trim() || '';
+            
+            // Check if this looks like a job ID (6-digit number)
+            if (/^\d{6}$/.test(text)) {
+              if (!jobIds.includes(text)) {
+                jobIds.push(text);
+                // If this is one of the debug rows, log which cell contained the job ID
+                if (index < 3 || index > rows.length - 3) {
+                  console.log(`Found job ID ${text} in cell ${i} of row ${index}`);
+                }
+                // We found a job ID in this row, so move to the next row
+                break;
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error extracting job ID from row:', error);
+        }
+      });
+      
+      console.log('Extracted job IDs:', {
+        totalIds: jobIds.length,
+        firstFewIds: jobIds.slice(0, 5),
+        lastFewIds: jobIds.slice(-5),
+        has410854: jobIds.includes('410854')
+      });
+      
+      return jobIds;
+    };
+    
     // Get all job IDs
-    const jobIds = scrapeJobIds();
-    console.log(`Found ${jobIds.length} jobs`);
+    const jobIds = extractJobIdsFromPage();
     
     if (progressCallback) {
       progressCallback(0, `Found ${jobIds.length} jobs. Starting overview fetch...`);
@@ -210,7 +315,6 @@ export async function fetchAllJobOverviews(
       
       // Process all jobs in the current batch in parallel
       const batchPromises = batch.map(async (jobId) => {
-        console.log(`Fetching overview for job ${jobId}...`);
         try {
           const html = await fetchJobOverview(jobId, actionToken);
           
@@ -236,7 +340,7 @@ export async function fetchAllJobOverviews(
             };
           }
         } catch (error) {
-          console.error(`Error fetching job ${jobId}:`, error);
+          // Error handled silently
         }
         return null;
       });
@@ -287,7 +391,6 @@ export async function fetchAllJobOverviews(
     
     return results;
   } catch (error) {
-    console.error('Error fetching all job overviews:', error);
     throw error;
   }
 }

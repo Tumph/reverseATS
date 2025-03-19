@@ -1,8 +1,8 @@
-// Main content script for the WaterlooWorks TR Counter extension
+// Main content script for the WaterlooWorks Job Matcher extension
 
-import { addTrCounterAndButton } from './modules/table-processor';
-import { createObserver, getObserverConfig } from './modules/observer';
+import { automaticallyRunScraper } from './modules/table-processor';
 import { injectMatchPercentagesIntoTable } from './modules/table-injector';
+import { setupPaginationObserver } from './modules/observer';
 
 // Check if resume exists in storage
 chrome.storage.local.get(['resumeText', 'jobOverviews', 'jobMatches'], (result) => {
@@ -20,24 +20,66 @@ chrome.storage.local.get(['resumeText', 'jobOverviews', 'jobMatches'], (result) 
   }
 });
 
+// Function to check URL and table conditions
+function checkConditionsAndSetupPaginationObserver() {
+  // Check if URL matches
+  const isCorrectURL = window.location.href.includes('https://waterlooworks.uwaterloo.ca/myAccount/co-op/direct/jobs.htm');
+
+  // Check if table with specific attribute exists
+  const targetTable = document.querySelector('table[data-v-17eef081]');
+  
+  // If both conditions are met, set up the pagination observer
+  if (isCorrectURL && targetTable) {
+    setupPaginationObserver();
+    
+    // Run scraper for initial load
+    if (initialSetup) {
+      automaticallyRunScraper();
+      initialSetup = false;
+    }
+  }
+}
+
+let initialSetup = true;
+
 // Run the function when the page is fully loaded
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
-      addTrCounterAndButton();
+      checkConditionsAndSetupPaginationObserver();
     }, 1000); // Delay to ensure page is fully loaded
   });
 } else {
   setTimeout(() => {
-    addTrCounterAndButton();
+    checkConditionsAndSetupPaginationObserver();
   }, 1000); // Delay to ensure page is fully loaded
 }
 
-// Create the observer
-const observer = createObserver();
+// Create a mutation observer to watch for the target table being added to the DOM
+const tableMutationObserver = new MutationObserver((mutations: MutationRecord[]) => {
+  // Check if our target table has been added to the DOM
+  const hasTargetTable = mutations.some(mutation => {
+    if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+      return Array.from(mutation.addedNodes).some(node => {
+        if (node instanceof Element) {
+          return node.tagName === 'TABLE' && node.hasAttribute('data-v-17eef081') ||
+                 node.querySelector && node.querySelector('table[data-v-17eef081]') !== null;
+        }
+        return false;
+      });
+    }
+    return false;
+  });
+  
+  if (hasTargetTable) {
+    checkConditionsAndSetupPaginationObserver();
+  }
+});
 
-// Start observing the document with the configured parameters
-// Delay the observer start to avoid initial page load conflicts
+// Start observing the document with the configured parameters for table changes
 setTimeout(() => {
-  observer.observe(document.body, getObserverConfig());
-}, 2000); // 2 second delay 
+  tableMutationObserver.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+}, 2000); 

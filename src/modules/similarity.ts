@@ -362,10 +362,6 @@ export function calculateTermFrequency(tokens: string[]): Record<string, number>
  * @returns Extracted plain text
  */
 export function extractTextFromHtml(html: string): string {
-  if (!html || typeof html !== 'string') {
-    return '';
-  }
-  
   try {
     // Create a temporary DOM element
     const doc = document.createElement('div');
@@ -378,7 +374,6 @@ export function extractTextFromHtml(html: string): string {
     // Get text content
     return doc.textContent || doc.innerText || '';
   } catch (error) {
-    console.error('Error extracting text from HTML:', error);
     return '';
   }
 }
@@ -449,7 +444,6 @@ export function extractJobDescription(text: string): string {
     
     return text.substring(startPos, endPos).trim();
   } catch (error) {
-    console.error("Error extracting job description:", error);
     return text;
   }
 }
@@ -720,17 +714,8 @@ export async function calculateJobResumeMatch(jobText: string, resumeText: strin
       entityMatch
     );
     
-    console.log('Match breakdown:', {
-      cosineSimilarity,
-      entityMatch,
-      jobKeywords: jobKeywordsObj.keywords.length,
-      resumeKeywords: resumeKeywordsObj.keywords.length,
-      hybridScore
-    });
-    
     return hybridScore;
   } catch (error) {
-    console.error("Error in calculateJobResumeMatch:", error);
     // Fallback to simple cosine similarity with minimum baseline
     return Math.max(
       calculateCosineSimilarity(jobText, resumeText), 

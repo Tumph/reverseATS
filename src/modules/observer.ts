@@ -1,7 +1,81 @@
 // Observer module for handling DOM mutations
 
 import { ObserverConfig } from './types';
-import { addTrCounterAndButton } from './table-processor';
+import { automaticallyRunScraper } from './table-processor';
+
+/**
+ * Creates a pagination observer to detect changes in the results count or range
+ * This will trigger the scraper to run when the pagination info changes
+ * @returns The created MutationObserver
+ */
+export function createPaginationObserver(): MutationObserver {
+  // Track current pagination state
+  let currentResultsCount = '';
+  let currentResultsRange = '';
+  
+  // Create the observer
+  const observer = new MutationObserver((mutations: MutationRecord[]) => {
+    // Look for pagination div changes
+    const paginationDiv = document.querySelector('div.table--view__pagination--data[data-v-17eef081]');
+    if (!paginationDiv) return;
+    
+    // Extract the current count and range
+    const resultsCountElement = paginationDiv.querySelector('div.margin--r--s');
+    const resultsRangeElement = paginationDiv.querySelector('div:not(.margin--r--s)');
+    
+    const newResultsCount = resultsCountElement ? resultsCountElement.textContent || '' : '';
+    const newResultsRange = resultsRangeElement ? resultsRangeElement.textContent || '' : '';
+    
+    // Detect if pagination has changed
+    const paginationChanged = (newResultsCount !== currentResultsCount || newResultsRange !== currentResultsRange) &&
+                               (newResultsCount !== '' && newResultsRange !== '');
+    
+    if (paginationChanged) {
+      console.log('Pagination changed:', { 
+        oldCount: currentResultsCount, 
+        newCount: newResultsCount,
+        oldRange: currentResultsRange,
+        newRange: newResultsRange
+      });
+      
+      // Update tracked state
+      currentResultsCount = newResultsCount;
+      currentResultsRange = newResultsRange;
+      
+      // Run the scraper when pagination changes to get new job IDs
+      setTimeout(() => {
+        console.log('Triggering scraper due to pagination change');
+        automaticallyRunScraper();
+      }, 1000); // Small delay to ensure the table has updated
+    }
+  });
+  
+  return observer;
+}
+
+/**
+ * Sets up pagination observer to watch for changes in result count or range
+ */
+export function setupPaginationObserver(): void {
+  // Create the pagination observer
+  const paginationObserver = createPaginationObserver();
+  
+  // Find the pagination div to observe
+  const paginationDiv = document.querySelector('div.table--view__pagination--data[data-v-17eef081]');
+  
+  if (paginationDiv) {
+    console.log('Setting up pagination observer');
+    paginationObserver.observe(paginationDiv, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+  } else {
+    console.log('Pagination div not found, will try again later');
+    // Try again later if the pagination div is not found
+    setTimeout(setupPaginationObserver, 1000);
+  }
+}
 
 /**
  * Creates a debounced version of the update function to prevent too many updates
@@ -18,8 +92,6 @@ export function createDebouncedUpdate(observer: MutationObserver): () => void {
       // Temporarily disconnect the observer to prevent infinite loops
       observer.disconnect();
       
-      // Reapply TR counters to any new tables
-      addTrCounterAndButton();
       
       // Reconnect the observer
       observer.observe(document.body, getObserverConfig());

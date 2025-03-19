@@ -137,7 +137,6 @@ async function handleFileUpload(event: Event) {
       
       showStatus('Resume text extracted successfully', 'success');
     } catch (error) {
-      console.error('Error processing PDF:', error);
       showStatus(`Error processing PDF: ${error instanceof Error ? error.message : String(error)}`, 'error');
     }
   }
@@ -161,16 +160,11 @@ function saveResume() {
   // Process the resume text for matching
   const processedText = preprocessText(resumeText).join(' ');
   
-  console.log('Saving processed resume text length:', processedText.length);
-  console.log('Processed text sample:', processedText.substring(0, 100) + '...');
-  
   chrome.storage.local.set({ 
     resumeText,
     resumeMetadata,
     processedResumeText: processedText // Store processed version for matching
   }, () => {
-    console.log('Resume data saved to storage, processed text length:', processedText.length);
-    
     // Check if we have any stored job overviews to preview matches
     chrome.storage.local.get(['jobOverviews'], async (result) => {
       if (result.jobOverviews && Array.isArray(result.jobOverviews) && result.jobOverviews.length > 0) {
@@ -197,7 +191,6 @@ function saveResume() {
             'success'
           );
         } catch (error) {
-          console.error('Error calculating matches:', error);
           showStatus('Resume saved, but error calculating matches', 'error');
         }
       } else {

@@ -14,6 +14,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdf.worker.js';
  * @returns Promise resolving to the extracted text
  */
 export async function extractTextFromPdf(arrayBuffer: ArrayBuffer): Promise<string> {
+  console.log('pdf-reader.ts extractTextFromPdf');
   try {
     // Clone the ArrayBuffer to prevent detachment issues
     const bufferClone = arrayBuffer.slice(0);
@@ -53,6 +54,7 @@ export async function extractTextFromPdf(arrayBuffer: ArrayBuffer): Promise<stri
  * @returns Promise resolving to PDF metadata
  */
 export async function extractPdfMetadata(arrayBuffer: ArrayBuffer): Promise<Record<string, any>> {
+  console.log('pdf-reader.ts extractPdfMetadata');
   try {
     // Clone the ArrayBuffer to prevent detachment issues
     const bufferClone = arrayBuffer.slice(0);
@@ -87,6 +89,7 @@ export async function extractPdfMetadata(arrayBuffer: ArrayBuffer): Promise<Reco
  * @returns Promise resolving to page count
  */
 export async function getPdfPageCount(arrayBuffer: ArrayBuffer): Promise<number> {
+  console.log('pdf-reader.ts getPdfPageCount');
   try {
     // Clone the ArrayBuffer to prevent detachment issues
     const bufferClone = arrayBuffer.slice(0);

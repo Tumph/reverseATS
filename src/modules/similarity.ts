@@ -1,7 +1,8 @@
 /**
  * Similarity comparison module for job descriptions and resumes
- * Includes text processing utilities for NLP operations
+ * Uses compromise.js for NLP operations
  */
+import nlp from 'compromise';
 
 /**
  * Common English stopwords to filter out from texts
@@ -29,8 +30,7 @@ const STOPWORDS = new Set([
 ]);
 
 /**
- * Important skills and keywords with their weights
- * Higher weight means the term is more important in the matching
+ * Important technical and job-related terms and their weights
  */
 export const TERM_WEIGHTS: Record<string, number> = {
   // Programming languages
@@ -87,341 +87,22 @@ export const TERM_WEIGHTS: Record<string, number> = {
 };
 
 /**
- * Additional engineering and job-specific terms that should be weighted
- * even if they don't appear in the main TERM_WEIGHTS list
- */
-export const ADDITIONAL_IMPORTANT_TERMS = [
-  // Engineering job titles
-  'engineer', 'developer', 'programmer', 'architect',
-  'scientist', 'analyst', 'administrator', 'devops',
-  
-  // Technical skills
-  'machine learning', 'data', 'security', 'networking',
-  'cloud', 'backend', 'frontend', 'fullstack', 'web',
-  'mobile', 'distributed', 'system', 'database',
-  'infrastructure', 'automation', 'testing', 'analytics',
-  
-  // Soft skills
-  'leadership', 'communication', 'teamwork', 'problem-solving',
-  'critical thinking', 'creativity', 'adaptability',
-  
-  // Common terms
-  'experience', 'skills', 'knowledge', 'degree', 'qualification',
-  'project', 'development', 'implementation', 'optimization',
-  'analysis', 'design', 'management', 'research', 'team',
-  'responsible', 'built', 'created', 'led', 'improved', 'increased'
-];
-
-/**
- * Synonym mapping for job/resume terms
- * Maps common terms to their synonyms or related terms
- */
-export const SYNONYM_MAP: Record<string, string[]> = {
-  // Development roles
-  'developer': ['engineer', 'programmer', 'coder', 'software engineer', 'implementer'],
-  'software engineer': ['developer', 'programmer', 'coder', 'engineer'],
-  'frontend': ['front-end', 'front end', 'ui', 'client-side'],
-  'backend': ['back-end', 'back end', 'server-side', 'api'],
-  'fullstack': ['full-stack', 'full stack', 'end-to-end'],
-  
-  // Common verbs
-  'develop': ['create', 'build', 'implement', 'code', 'program', 'engineer'],
-  'design': ['architect', 'plan', 'model', 'structure'],
-  'analyze': ['examine', 'assess', 'evaluate', 'review'],
-  'lead': ['manage', 'direct', 'guide', 'coordinate', 'supervise'],
-  'collaborate': ['work with', 'cooperate', 'team up', 'partner'],
-  
-  // Technical terms
-  'api': ['interface', 'endpoint', 'service', 'integration'],
-  'database': ['db', 'data store', 'storage', 'repository'],
-  'algorithm': ['method', 'procedure', 'routine', 'computation'],
-  'deploy': ['release', 'ship', 'publish', 'launch'],
-  'debug': ['troubleshoot', 'fix', 'resolve', 'diagnose']
-};
-
-/**
- * Weights for different sections in the matching algorithm
- */
-export const SECTION_WEIGHTS: Record<string, number> = {
-  'skills': 2.0,
-  'experience': 1.5,
-  'responsibilities': 1.8,
-  'requirements': 1.8,
-  'education': 0.7
-};
-
-/**
- * Configure weights for the hybrid scoring approach
- */
-export const SCORING_WEIGHTS = {
-  KEYWORD_MATCH: 0.45,      // Direct keyword matching
-  COSINE_SIMILARITY: 0.35,  // Cosine similarity score
-  ENTITY_EXTRACTION: 0.2,   // Entity extraction matching
-  
-  // Score boosting parameters
-  SKILL_MATCH_BOOST: 0.3,   // Reduced from 1.5 to 0.3 - Boost if key skills match
-  CONTEXT_BOOST: 0.2,       // Reduced from 1.2 to 0.2 - Boost if important context words match
-  
-  // Minimum baseline score (to avoid extremely low percentages)
-  MIN_BASELINE_SCORE: 0.05  // Reduced from 0.15 to 0.05 - 5% minimum score for any comparison
-};
-
-/**
- * Check if a text contains important keywords
- * @param text Text to check for important keywords
- * @returns Object with found keywords and their importance
- */
-export function extractImportantKeywords(text: string): {
-  keywords: string[];
-  importance: number;
-} {
-  if (!text) {
-    return { keywords: [], importance: 0 };
-  }
-  
-  // Convert to lowercase for case-insensitive matching
-  const lowerText = text.toLowerCase();
-  const foundKeywords: string[] = [];
-  let totalImportance = 0;
-  
-  // Check for terms from TERM_WEIGHTS
-  for (const [term, weight] of Object.entries(TERM_WEIGHTS)) {
-    if (lowerText.includes(term)) {
-      foundKeywords.push(term);
-      totalImportance += weight;
-    }
-  }
-  
-  // Check for additional important terms
-  for (const term of ADDITIONAL_IMPORTANT_TERMS) {
-    if (lowerText.includes(term) && !foundKeywords.includes(term)) {
-      foundKeywords.push(term);
-      totalImportance += 1.0; // Default weight for additional terms
-    }
-  }
-  
-  return {
-    keywords: foundKeywords,
-    importance: totalImportance
-  };
-}
-
-/**
- * Browser-friendly implementation to extract entities and key phrases from text
- * @param text Text to analyze
- * @returns Array of extracted entities and key phrases
- */
-export function extractEntities(text: string): string[] {
-  // Tokenize the text first
-  const tokens = tokenize(text);
-  
-  // Filter out stopwords and short tokens
-  const filteredTokens = tokens
-    .filter(token => token.length > 2 && !STOPWORDS.has(token.toLowerCase()))
-    .map(token => token.toLowerCase());
-  
-  // Count token frequencies to identify key terms
-  const tokenCounts: Record<string, number> = {};
-  for (const token of filteredTokens) {
-    tokenCounts[token] = (tokenCounts[token] || 0) + 1;
-  }
-  
-  // Sort by frequency and return top terms
-  const sortedTokens = Object.entries(tokenCounts)
-    .sort((a, b) => b[1] - a[1])
-    .map(([token]) => token);
-  
-  // Return top entities (limited to 50 to avoid excessive matching)
-  return sortedTokens.slice(0, 50);
-}
-
-/**
- * Get common keywords between two sets
- * @param set1 First set of keywords
- * @param set2 Second set of keywords
- * @returns Object with common keywords and percentage match
- */
-export function getCommonKeywords(set1: string[], set2: string[]): {
-  common: string[];
-  percentMatch: number;
-} {
-  if (!set1.length || !set2.length) {
-    return { common: [], percentMatch: 0 };
-  }
-  
-  // Convert to Sets for faster lookups
-  const set1Lower = new Set(set1.map(k => k.toLowerCase()));
-  const set2Lower = new Set(set2.map(k => k.toLowerCase()));
-  
-  // Find common keywords
-  const common: string[] = [];
-  for (const keyword of Array.from(set1Lower)) {
-    if (set2Lower.has(keyword)) {
-      common.push(keyword);
-    }
-  }
-  
-  // Calculate percentage based on the smaller set's size
-  const minSetSize = Math.min(set1Lower.size, set2Lower.size);
-  const percentMatch = minSetSize > 0 ? common.length / minSetSize : 0;
-  
-  return { common, percentMatch };
-}
-
-/**
- * Simplified stemming function
- * @param word Word to stem
- * @returns Stemmed word
- */
-export function stem(word: string): string {
-  if (word.length < 3) return word;
-  
-  // Simple stemming rules
-  if (word.endsWith('ing')) {
-    const stem = word.slice(0, -3);
-    return stem.length > 2 ? stem : word;
-  } else if (word.endsWith('ed') && !word.endsWith('eed')) {
-    const stem = word.slice(0, -2);
-    return stem.length > 2 ? stem : word;
-  } else if (word.endsWith('s') && !word.endsWith('ss') && !word.endsWith('us')) {
-    return word.slice(0, -1);
-  } else if (word.endsWith('ly')) {
-    return word.slice(0, -2);
-  } else if (word.endsWith('ment')) {
-    return word.slice(0, -4);
-  } else if (word.endsWith('ies')) {
-    return word.slice(0, -3) + 'y';
-  } else if (word.endsWith('es') && !word.endsWith('ss')) {
-    return word.slice(0, -2);
-  }
-  
-  return word;
-}
-
-/**
- * Tokenize text into words
- * @param text Text to tokenize
- * @returns Array of tokens
- */
-export function tokenize(text: string): string[] {
-  // Remove non-alphanumeric characters and convert to lowercase
-  const cleanText = text.toLowerCase()
-    .replace(/[^\w\s]/g, ' ')  // Replace punctuation with spaces
-    .replace(/\s+/g, ' ')      // Replace multiple spaces with single space
-    .trim();                   // Remove leading/trailing spaces
-  
-  // Split by whitespace
-  return cleanText.split(' ');
-}
-
-/**
- * Enhanced preprocessing for text
- * This version preserves important terms that might be removed by
- * standard preprocessing
- * @param text Raw text to preprocess
- * @returns Array of processed tokens
- */
-export function preprocessText(text: string): string[] {
-  if (!text || typeof text !== 'string') {
-    return [];
-  }
-  
-  // Extract important keywords first so they don't get stemmed/filtered
-  const { keywords } = extractImportantKeywords(text);
-  
-  // Tokenize
-  const tokens = tokenize(text);
-  
-  // Filter out stopwords and stem
-  const processedTokens = tokens
-    .filter(token => token.length > 2 && !STOPWORDS.has(token))
-    .map(token => stem(token));
-  
-  // Add important keywords back in
-  return [...new Set([...processedTokens, ...keywords])];
-}
-
-/**
- * Calculates basic term frequency for tokens
- * @param tokens Array of tokens
- * @returns Map of term frequencies
- */
-export function calculateTermFrequency(tokens: string[]): Record<string, number> {
-  const freqMap: Record<string, number> = {};
-  
-  for (const token of tokens) {
-    freqMap[token] = (freqMap[token] || 0) + 1;
-  }
-  
-  return freqMap;
-}
-
-/**
  * Extracts plain text from HTML string
  * @param html HTML content
  * @returns Extracted plain text
  */
 export function extractTextFromHtml(html: string): string {
   try {
-    // Create a temporary DOM element
     const doc = document.createElement('div');
     doc.innerHTML = html;
     
-    // Remove script and style elements
     const scripts = doc.querySelectorAll('script, style');
     scripts.forEach(element => element.remove());
     
-    // Get text content
     return doc.textContent || doc.innerText || '';
   } catch (error) {
     return '';
   }
-}
-
-/**
- * Calculates the cosine similarity between two texts
- * @param text1 First text for comparison
- * @param text2 Second text for comparison
- * @returns Similarity score between 0 and 1
- */
-export function calculateCosineSimilarity(text1: string, text2: string): number {
-  // Preprocess both texts
-  const tokens1 = preprocessText(text1);
-  const tokens2 = preprocessText(text2);
-  
-  if (tokens1.length === 0 || tokens2.length === 0) {
-    return 0;
-  }
-  
-  // Calculate term frequencies
-  const freqMap1 = calculateTermFrequency(tokens1);
-  const freqMap2 = calculateTermFrequency(tokens2);
-  
-  // Get all unique terms
-  const allTerms = new Set([...tokens1, ...tokens2]);
-  
-  // Calculate cosine similarity
-  let dotProduct = 0;
-  let magnitude1 = 0;
-  let magnitude2 = 0;
-  
-  // For each term in the combined vocabulary
-  allTerms.forEach(term => {
-    const val1 = freqMap1[term] || 0;
-    const val2 = freqMap2[term] || 0;
-    
-    dotProduct += val1 * val2;
-    magnitude1 += val1 * val1;
-    magnitude2 += val2 * val2;
-  });
-  
-  // Prevent division by zero
-  if (magnitude1 === 0 || magnitude2 === 0) {
-    return 0;
-  }
-  
-  // Calculate cosine similarity
-  return dotProduct / (Math.sqrt(magnitude1) * Math.sqrt(magnitude2));
 }
 
 /**
@@ -449,283 +130,192 @@ export function extractJobDescription(text: string): string {
 }
 
 /**
- * Expands text with synonyms for better matching
- * @param text The original text
- * @returns Text expanded with synonyms
+ * Preprocesses text using compromise.js
+ * 
+ * @param text Raw text to process
+ * @returns Processed text document
  */
-export function expandWithSynonyms(text: string): string {
-  // Convert to lowercase for case-insensitive matching
-  const lowerText = text.toLowerCase();
+export function preprocessText(text: string) {
+  const doc = nlp(text);
   
-  // Create an array to store the added synonyms
-  const synonymsToAdd: string[] = [];
+  // Normalize the text (lowercase, handle contractions)
+  doc.normalize();
   
-  // Check each term in synonym map
-  for (const [term, synonyms] of Object.entries(SYNONYM_MAP)) {
-    // If the text contains the term, add all its synonyms
-    if (lowerText.includes(term)) {
-      synonyms.forEach(synonym => {
-        // Only add the synonym if it's not already in the text
-        if (!lowerText.includes(synonym)) {
-          synonymsToAdd.push(synonym);
-        }
-      });
+  return doc;
+}
+
+/**
+ * Extract keywords from text using compromise.js
+ * 
+ * @param text Text to extract keywords from
+ * @returns Array of keywords
+ */
+export function extractKeywords(text: string): string[] {
+  const doc = preprocessText(text);
+  
+  // Get nouns, technical terms and important verbs
+  const terms = doc.nouns().out('array');
+  const verbs = doc.verbs().out('array');
+  const techs = doc.match('#Technology').out('array');
+  
+  // Combine all terms
+  const allTerms = [...new Set([...terms, ...verbs, ...techs])];
+  
+  // Filter out stopwords and short terms
+  return allTerms
+    .filter((term: string) => term.length > 2 && !STOPWORDS.has(term.toLowerCase()))
+    .map((term: string) => term.toLowerCase());
+}
+
+/**
+ * Get common keywords between two sets of terms
+ * 
+ * @param terms1 First set of terms
+ * @param terms2 Second set of terms
+ * @returns Object with common terms and match percentage
+ */
+function getCommonTerms(terms1: string[], terms2: string[]): { 
+  common: string[]; 
+  percentMatch: number; 
+} {
+  if (!terms1.length || !terms2.length) {
+    return { common: [], percentMatch: 0 };
+  }
+  
+  const set1 = new Set(terms1.map(term => term.toLowerCase()));
+  const set2 = new Set(terms2.map(term => term.toLowerCase()));
+  
+  const common: string[] = [];
+  for (const term of set1) {
+    if (set2.has(term)) {
+      common.push(term);
     }
   }
   
-  // Return the original text if no synonyms to add
-  if (synonymsToAdd.length === 0) {
-    return text;
-  }
+  const minSetSize = Math.min(set1.size, set2.size);
+  const percentMatch = minSetSize > 0 ? common.length / minSetSize : 0;
   
-  // Add the synonyms to the original text
-  return `${text} ${synonymsToAdd.join(' ')}`;
+  return { common, percentMatch };
 }
 
 /**
- * Applies weights to term frequencies for enhanced matching
- * @param tokens Array of tokens
- * @returns Weighted term frequency map
- */
-export function calculateWeightedTermFrequency(tokens: string[]): Record<string, number> {
-  const freqMap: Record<string, number> = {};
-  
-  for (const token of tokens) {
-    // Convert to lowercase for case-insensitive matching
-    const lowerToken = token.toLowerCase();
-    
-    // Apply weight if the token is in the term weights map
-    const weight = TERM_WEIGHTS[lowerToken] || 1.0;
-    
-    // Update the frequency map with the weighted value
-    freqMap[lowerToken] = (freqMap[lowerToken] || 0) + weight;
-  }
-  
-  return freqMap;
-}
-
-/**
- * Calculate weighted cosine similarity between two texts
+ * Calculate text similarity using compromise.js
+ * 
  * @param text1 First text
  * @param text2 Second text
  * @returns Similarity score between 0 and 1
  */
-export function calculateWeightedCosineSimilarity(text1: string, text2: string): number {
-  // Preprocess both texts
-  const tokens1 = preprocessText(text1);
-  const tokens2 = preprocessText(text2);
+function calculateTextSimilarity(text1: string, text2: string): number {
+  // Preprocess texts
+  const doc1 = preprocessText(text1);
+  const doc2 = preprocessText(text2);
   
-  if (tokens1.length === 0 || tokens2.length === 0) {
+  // Get terms from both texts
+  const terms1 = doc1.terms().out('array').map((t: string) => t.toLowerCase());
+  const terms2 = doc2.terms().out('array').map((t: string) => t.toLowerCase());
+  
+  // Filter out stopwords
+  const filteredTerms1 = terms1.filter((term: string) => !STOPWORDS.has(term) && term.length > 2);
+  const filteredTerms2 = terms2.filter((term: string) => !STOPWORDS.has(term) && term.length > 2);
+  
+  if (filteredTerms1.length === 0 || filteredTerms2.length === 0) {
     return 0;
   }
   
-  // Calculate weighted term frequencies
-  const freqMap1 = calculateWeightedTermFrequency(tokens1);
-  const freqMap2 = calculateWeightedTermFrequency(tokens2);
+  // Calculate Jaccard similarity
+  const set1 = new Set(filteredTerms1);
+  const set2 = new Set(filteredTerms2);
   
-  // Get all unique terms
-  const allTerms = new Set([...tokens1, ...tokens2]);
+  const intersection = new Set([...set1].filter(term => set2.has(term)));
+  const union = new Set([...set1, ...set2]);
   
-  // Calculate weighted cosine similarity
-  let dotProduct = 0;
-  let magnitude1 = 0;
-  let magnitude2 = 0;
+  return intersection.size / union.size;
+}
+
+/**
+ * Calculate weighted similarity with emphasis on technical terms
+ * 
+ * @param text1 First text
+ * @param text2 Second text
+ * @returns Weighted similarity score between 0 and 1
+ */
+function calculateWeightedSimilarity(text1: string, text2: string): number {
+  // Extract all terms
+  const doc1 = preprocessText(text1);
+  const doc2 = preprocessText(text2);
   
-  // For each term in the combined vocabulary
-  allTerms.forEach(term => {
-    const val1 = freqMap1[term] || 0;
-    const val2 = freqMap2[term] || 0;
-    
-    dotProduct += val1 * val2;
-    magnitude1 += val1 * val1;
-    magnitude2 += val2 * val2;
-  });
+  // Get all terms
+  const terms1 = doc1.terms().out('array').map((t: string) => t.toLowerCase());
+  const terms2 = doc2.terms().out('array').map((t: string) => t.toLowerCase());
   
-  // Prevent division by zero
-  if (magnitude1 === 0 || magnitude2 === 0) {
+  // Filter out stopwords
+  const filteredTerms1 = terms1.filter((term: string) => !STOPWORDS.has(term) && term.length > 2);
+  const filteredTerms2 = terms2.filter((term: string) => !STOPWORDS.has(term) && term.length > 2);
+  
+  if (filteredTerms1.length === 0 || filteredTerms2.length === 0) {
     return 0;
   }
   
-  // Calculate cosine similarity
-  return dotProduct / (Math.sqrt(magnitude1) * Math.sqrt(magnitude2));
+  // Get technical terms specifically
+  const techTerms1 = filteredTerms1.filter((term: string) => TERM_WEIGHTS[term]);
+  const techTerms2 = filteredTerms2.filter((term: string) => TERM_WEIGHTS[term]);
+  
+  // Calculate base Jaccard similarity for all terms
+  const set1 = new Set(filteredTerms1);
+  const set2 = new Set(filteredTerms2);
+  const intersection = new Set([...set1].filter((term) => set2.has(term as string)));
+  const union = new Set([...set1, ...set2]);
+  
+  // Weight technical matches more heavily
+  let techBoost = 0;
+  if (techTerms1.length > 0 && techTerms2.length > 0) {
+    const techSet1 = new Set(techTerms1);
+    const techSet2 = new Set(techTerms2);
+    const techIntersection = new Set([...techSet1].filter((term) => techSet2.has(term as string)));
+    techBoost = (techIntersection.size / Math.min(techSet1.size, techSet2.size)) * 0.3;
+  }
+  
+  // Combine base similarity with technical boost
+  return Math.min((intersection.size / union.size) + techBoost, 1.0);
 }
 
 /**
- * Identify skill-related sections in job description
- * @param text Full text to analyze
- * @returns Object with extracted sections
- */
-export function extractTextSections(text: string): Record<string, string> {
-  const sections: Record<string, string> = {};
-  
-  // Simple section identification based on common keywords
-  if (text.toLowerCase().includes('qualifications') || text.toLowerCase().includes('requirements')) {
-    const qualificationsStart = text.toLowerCase().indexOf('qualifications');
-    const requirementsStart = text.toLowerCase().indexOf('requirements');
-    
-    let sectionStart = -1;
-    let sectionName = '';
-    
-    if (qualificationsStart !== -1 && (requirementsStart === -1 || qualificationsStart < requirementsStart)) {
-      sectionStart = qualificationsStart;
-      sectionName = 'requirements';
-    } else if (requirementsStart !== -1) {
-      sectionStart = requirementsStart;
-      sectionName = 'requirements';
-    }
-    
-    if (sectionStart !== -1) {
-      // Look for the next section start or use the end of text
-      const nextSectionStart = text.toLowerCase().substring(sectionStart + 10).search(/\b(responsibilities|skills|experience|education|about|company)\b/i);
-      
-      if (nextSectionStart !== -1) {
-        sections[sectionName] = text.substring(sectionStart, sectionStart + 10 + nextSectionStart).trim();
-      } else {
-        sections[sectionName] = text.substring(sectionStart).trim();
-      }
-    }
-  }
-  
-  // Extract skills section if present
-  if (text.toLowerCase().includes('skills')) {
-    const skillsStart = text.toLowerCase().indexOf('skills');
-    
-    // Look for the next section start or use the end of text
-    const nextSectionStart = text.toLowerCase().substring(skillsStart + 6).search(/\b(responsibilities|experience|education|qualifications|requirements|about|company)\b/i);
-    
-    if (nextSectionStart !== -1) {
-      sections['skills'] = text.substring(skillsStart, skillsStart + 6 + nextSectionStart).trim();
-    } else {
-      sections['skills'] = text.substring(skillsStart).trim();
-    }
-  }
-  
-  // Extract experience section if present
-  if (text.toLowerCase().includes('experience')) {
-    const experienceStart = text.toLowerCase().indexOf('experience');
-    
-    // Look for the next section start or use the end of text
-    const nextSectionStart = text.toLowerCase().substring(experienceStart + 10).search(/\b(skills|education|qualifications|requirements|about|company)\b/i);
-    
-    if (nextSectionStart !== -1) {
-      sections['experience'] = text.substring(experienceStart, experienceStart + 10 + nextSectionStart).trim();
-    } else {
-      sections['experience'] = text.substring(experienceStart).trim();
-    }
-  }
-  
-  // Add the full text as a fallback
-  sections['full'] = text;
-  
-  return sections;
-}
-
-/**
- * Calculate the combined hybrid similarity score
- * @param jobKeywords Important keywords from job description
- * @param resumeKeywords Important keywords from resume
- * @param cosineSimilarity Cosine similarity score
- * @param entityMatch Entity match percentage
- * @returns Enhanced similarity score between 0 and 1
- */
-export function calculateHybridScore(
-  jobKeywords: string[],
-  resumeKeywords: string[],
-  cosineSimilarity: number,
-  entityMatch: number
-): number {
-  // Get common keywords and match percentage
-  const { common, percentMatch } = getCommonKeywords(jobKeywords, resumeKeywords);
-  
-  // Calculate scores for each component
-  const keywordScore = percentMatch * SCORING_WEIGHTS.KEYWORD_MATCH;
-  const cosineScore = cosineSimilarity * SCORING_WEIGHTS.COSINE_SIMILARITY;
-  const entityScore = entityMatch * SCORING_WEIGHTS.ENTITY_EXTRACTION;
-  
-  // Calculate base score
-  let combinedScore = keywordScore + cosineScore + entityScore;
-  
-  // Apply skill match boost if applicable - with diminishing returns
-  if (common.length > 0) {
-    // Apply a smaller boost with a log scale to prevent scores from shooting up too high
-    const skillBoost = Math.log(common.length + 1) / 10 * SCORING_WEIGHTS.SKILL_MATCH_BOOST;
-    combinedScore *= (1 + skillBoost);
-  }
-  
-  // Apply a context boost if important context terms are present - with diminishing returns
-  const contextMatches = jobKeywords.filter(kw => 
-    TERM_WEIGHTS[kw] && resumeKeywords.includes(kw)
-  ).length;
-  
-  if (contextMatches > 0) {
-    // Use a log scale here too to prevent excessive boost
-    const contextBoost = Math.log(contextMatches + 1) / 8 * SCORING_WEIGHTS.CONTEXT_BOOST;
-    combinedScore *= (1 + contextBoost);
-  }
-  
-  // Apply a more aggressive nonlinear scaling to create better distribution
-  // This sigmoid-inspired curve will create more differentiation between scores
-  combinedScore = (
-    1 / (1 + Math.exp(-10 * (combinedScore - 0.5))) * 0.88 + 
-    Math.pow(combinedScore, 1.5) * 0.12
-  );
-  
-  // Enforce minimum baseline score
-  combinedScore = Math.max(combinedScore, SCORING_WEIGHTS.MIN_BASELINE_SCORE);
-  
-  // Cap the score at 1.0
-  return Math.min(combinedScore, 1.0);
-}
-
-/**
- * Calculates similarity between job description and resume using a hybrid approach
+ * Calculates similarity between job description and resume
+ * 
  * @param jobText Job description text
  * @param resumeText Resume text
- * @returns Similarity score between 0 and 1
+ * @returns Promise with similarity score between 0 and 1
  */
 export async function calculateJobResumeMatch(jobText: string, resumeText: string): Promise<number> {
   try {
-    // Extract relevant job description section
+    // Extract job description section
     const jobDescription = extractJobDescription(jobText);
     
-    // Expand with synonyms
-    const expandedJobText = expandWithSynonyms(jobDescription);
-    const expandedResumeText = expandWithSynonyms(resumeText);
+    // Calculate similarity
+    const similarity = calculateWeightedSimilarity(jobDescription, resumeText);
     
-    // Extract keyword sets
-    const jobKeywordsObj = extractImportantKeywords(expandedJobText);
-    const resumeKeywordsObj = extractImportantKeywords(expandedResumeText);
+    // Extract keywords for additional weight
+    const jobKeywords = extractKeywords(jobDescription);
+    const resumeKeywords = extractKeywords(resumeText);
     
-    // Get entities
-    const jobEntities = extractEntities(expandedJobText);
-    const resumeEntities = extractEntities(expandedResumeText);
+    // Get common keywords
+    const { percentMatch } = getCommonTerms(jobKeywords, resumeKeywords);
     
-    // Calculate entity match
-    const { percentMatch: entityMatch } = getCommonKeywords(jobEntities, resumeEntities);
+    // Final score is weighted combination of text similarity and keyword matches
+    const finalScore = (similarity * 0.6) + (percentMatch * 0.4);
     
-    // Calculate traditional cosine similarity
-    const cosineSimilarity = calculateWeightedCosineSimilarity(expandedJobText, expandedResumeText);
-    
-    // Calculate hybrid score 
-    const hybridScore = calculateHybridScore(
-      jobKeywordsObj.keywords,
-      resumeKeywordsObj.keywords,
-      cosineSimilarity,
-      entityMatch
-    );
-    
-    return hybridScore;
+    // Ensure score is between 0 and 1
+    return Math.min(Math.max(finalScore, 0.05), 1.0);
   } catch (error) {
-    // Fallback to simple cosine similarity with minimum baseline
-    return Math.max(
-      calculateCosineSimilarity(jobText, resumeText), 
-      SCORING_WEIGHTS.MIN_BASELINE_SCORE
-    );
+    console.error('Error calculating job-resume match:', error);
+    // Fallback to 0.05 (5%) as minimum score
+    return 0.05;
   }
 }
 
 /**
  * Formats similarity score as a percentage with color coding
+ * 
  * @param similarity Similarity score between 0 and 1
  * @returns Object with formatted percentage and color
  */
@@ -739,7 +329,7 @@ export function formatSimilarityScore(similarity: number): {
   let color = '#dc3545'; // Poor match - red
   let isGoodMatch = false;
   
-  // Color thresholds adjusted for the new scoring curve
+  // Color thresholds
   if (matchScore >= 80) {
     color = '#28a745'; // Excellent match - green
     isGoodMatch = true;

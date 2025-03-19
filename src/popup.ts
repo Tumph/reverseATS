@@ -158,7 +158,8 @@ function saveResume() {
   const resumeMetadata = fileInfoContent ? { html: fileInfoContent } : null;
   
   // Process the resume text for matching
-  const processedText = preprocessText(resumeText).join(' ');
+  const processedDoc = preprocessText(resumeText);
+  const processedText = processedDoc.text();
   
   chrome.storage.local.set({ 
     resumeText,

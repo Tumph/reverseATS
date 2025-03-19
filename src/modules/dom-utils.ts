@@ -6,6 +6,7 @@
  */
 
 export function createStyledContainer(): HTMLDivElement {
+  console.log('dom-utils.ts createStyledContainer');
   const container = document.createElement('div');
   container.className = 'tr-counter-container';
   container.style.margin = '10px 0';
@@ -26,6 +27,7 @@ export function createStyledContainer(): HTMLDivElement {
  * @returns The created loading indicator element
  */
 export function createLoadingIndicator(): HTMLDivElement {
+  console.log('dom-utils.ts createLoadingIndicator');
   const loadingIndicator = document.createElement('div');
   loadingIndicator.className = 'loading-indicator';
   loadingIndicator.style.marginTop = '10px';
@@ -82,6 +84,7 @@ export function createLoadingIndicator(): HTMLDivElement {
  * @param statusMessage Optional status message to display
  */
 export function updateLoadingProgress(loadingIndicator: HTMLDivElement, progress: number, statusMessage?: string): void {
+  console.log('dom-utils.ts updateLoadingProgress');
   const progressBar = loadingIndicator.querySelector('.progress-bar') as HTMLDivElement;
   const percentageText = loadingIndicator.querySelector('.percentage-text') as HTMLDivElement;
   const statusText = loadingIndicator.querySelector('.loading-status-text') as HTMLDivElement;
@@ -108,6 +111,7 @@ export function updateLoadingProgress(loadingIndicator: HTMLDivElement, progress
  * @ returns The created job details display element
  */
 export function createJobDetailsDisplay(): HTMLDivElement {
+  console.log('dom-utils.ts createJobDetailsDisplay');
   const jobDetailsDisplay = document.createElement('div');
   jobDetailsDisplay.className = 'job-details-display';
   jobDetailsDisplay.style.marginTop = '10px';

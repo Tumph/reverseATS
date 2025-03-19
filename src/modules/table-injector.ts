@@ -4,10 +4,50 @@ import { formatSimilarityScore } from './similarity';
 import { JobOverview } from './types';
 
 /**
+ * Removes any existing match percentage columns from the WaterlooWorks table
+ * @returns void
+ */
+export function removeMatchPercentagesFromTable(): void {
+  console.log('table-injector.ts removeMatchPercentagesFromTable');
+  
+  // Find the table containing the job postings
+  const table = document.querySelector('table[data-v-17eef081]');
+  if (!table) return;
+  
+  // Remove match column header
+  const matchHeader = table.querySelector('th[data-match-column="true"]');
+  if (matchHeader && matchHeader.parentNode) {
+    matchHeader.parentNode.removeChild(matchHeader);
+  }
+  
+  // Remove match column from colgroup
+  const colgroup = table.querySelector('colgroup');
+  if (colgroup) {
+    const cols = colgroup.querySelectorAll('col');
+    // Match column is the first or second col (before ID column)
+    if (cols.length > 1) {
+      // Remove the column before the ID column
+      colgroup.removeChild(cols[1]);
+    }
+  }
+  
+  // Remove all match cells from table rows
+  const matchCells = table.querySelectorAll('td[data-job-id]');
+  matchCells.forEach(cell => {
+    if (cell.parentNode) {
+      cell.parentNode.removeChild(cell);
+    }
+  });
+  
+  console.log('Removed all match percentage elements from table');
+}
+
+/**
  * Injects a match percentage column into the WaterlooWorks table
  * @param overviews Array of job overviews with match scores
  */
 export async function injectMatchPercentagesIntoTable(overviews: JobOverview[]): Promise<void> {
+  console.log('table-injector.ts injectMatchPercentagesIntoTable');
   if (!overviews || overviews.length === 0) return;
   
   // Find the table containing the job postings
@@ -91,10 +131,7 @@ export async function injectMatchPercentagesIntoTable(overviews: JobOverview[]):
           span.style.color = color;
           span.textContent = score;
         }
-        
-        if (jobId === '410854' || index < 3 || index > bodyRows.length - 3) {
-          console.log(`Updated existing match cell for row ${index} with job ID ${jobId}`);
-        }
+
       }
       return; // Skip further processing for this row
     }
@@ -118,20 +155,12 @@ export async function injectMatchPercentagesIntoTable(overviews: JobOverview[]):
         jobId = text;
         idCell = cell;
         
-        // If this is one of the debug rows or our target job ID, log which cell contained it
-        if (jobId === '410854' || index < 3 || index > bodyRows.length - 3) {
-          console.log(`Found job ID ${jobId} in cell ${i} of row ${index}`);
-        }
         break;
       }
     }
     
     if (!jobId || !idCell) return;
-    
-    // Log for debugging specific job IDs we're interested in
-    if (jobId === '410854' || index < 3 || index > bodyRows.length - 3) {
-      console.log(`Adding match cell to row ${index} with job ID ${jobId} (has score: ${!!matchScores[jobId]})`);
-    }
+
     
     // Create match cell
     const matchCell = createMatchCell(jobId, matchScores[jobId] || 0);
@@ -146,6 +175,7 @@ export async function injectMatchPercentagesIntoTable(overviews: JobOverview[]):
  * @returns The created header cell element
  */
 function createMatchHeader(): HTMLTableHeaderCellElement {
+  console.log('table-injector.ts createMatchHeader');
   // Create the header cell
   const th = document.createElement('th');
   th.className = 'table__heading overflow--hidden';
@@ -229,16 +259,13 @@ function createMatchHeader(): HTMLTableHeaderCellElement {
  * @returns The created match cell element
  */
 function createMatchCell(jobId: string, matchScore: number): HTMLTableCellElement {
+  console.log('table-injector.ts createMatchCell');
   // Create the cell
   const td = document.createElement('td');
   td.className = 'table__value overflow--hidden';
   td.setAttribute('data-job-id', jobId);
   td.setAttribute('data-match-score', matchScore.toString());
   
-  // DEBUG: Log creation of match cell for job ID 410854
-  if (jobId === '410854') {
-    console.log('Creating match cell for job ID 410854', { jobId, matchScore });
-  }
   
   // Get formatted score and color
   const { score, color } = formatSimilarityScore(matchScore);
@@ -260,6 +287,7 @@ function createMatchCell(jobId: string, matchScore: number): HTMLTableCellElemen
  * @param direction Sort direction ('asc', 'desc', or 'none')
  */
 function sortTableByMatchPercentage(table: HTMLTableElement | null, direction: 'asc' | 'desc' | 'none'): void {
+  console.log('table-injector.ts sortTableByMatchPercentage');
   if (!table || direction === 'none') return;
   
   const tbody = table.querySelector('tbody');
@@ -289,6 +317,7 @@ function sortTableByMatchPercentage(table: HTMLTableElement | null, direction: '
  * @param matchScores Map of job IDs to match scores
  */
 function updateExistingMatchCells(table: Element, matchScores: Record<string, number>): void {
+  console.log('table-injector.ts updateExistingMatchCells');
   // Find all match cells
   const matchCells = table.querySelectorAll('td[data-job-id]');
   
@@ -316,6 +345,7 @@ function updateExistingMatchCells(table: Element, matchScores: Record<string, nu
  * Adds CSS styles for sorting icons
  */
 function addSortingStyles(): void {
+  console.log('table-injector.ts addSortingStyles');
   const style = document.createElement('style');
   style.textContent = `
     th[data-match-column][data-sort-direction="asc"] .material-icons {
@@ -334,6 +364,7 @@ function addSortingStyles(): void {
  * @returns Promise resolving to array of job matches with scores
  */
 async function getJobMatches(overviews: JobOverview[]): Promise<Array<{jobId: string, score: number}>> {
+  console.log('table-injector.ts getJobMatches');
   // Get the processed resume text for matching
   return new Promise((resolve) => {
     chrome.storage.local.get(['jobMatches'], (result) => {

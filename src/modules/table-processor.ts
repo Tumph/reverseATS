@@ -7,7 +7,7 @@ import {
 } from './dom-utils';
 
 import { fetchAllJobOverviews } from './scraper';
-import { injectMatchPercentagesIntoTable } from './table-injector';
+import { injectMatchPercentagesIntoTable, removeMatchPercentagesFromTable } from './table-injector';
 import { calculateJobResumeMatch } from './similarity';
 
 /**
@@ -15,7 +15,10 @@ import { calculateJobResumeMatch } from './similarity';
  * This function doesn't add any buttons, just runs the scraper
  */
 export async function automaticallyRunScraper(): Promise<void> {
+  console.log('table-processor.ts automaticallyRunScraper');
   try {
+    // Notify that scraping has started
+    chrome.runtime.sendMessage({ action: 'scrapingStarted' });
     
     // Check if resume exists first
     const resumeResult = await new Promise<{resumeText?: string}>((resolve) => {
@@ -24,8 +27,13 @@ export async function automaticallyRunScraper(): Promise<void> {
     
     if (!resumeResult.resumeText) {
       chrome.runtime.sendMessage({ action: 'openPopup' });
+      // Notify that scraping has finished
+      chrome.runtime.sendMessage({ action: 'scrapingFinished' });
       return;
     }
+    
+    // Remove any existing match percentages from the table
+    removeMatchPercentagesFromTable();
     
     // We need to scrape fresh job IDs each time, even if we have existing overviews
     // This ensures we get the current jobs on the page rather than stale data
@@ -69,18 +77,17 @@ export async function automaticallyRunScraper(): Promise<void> {
     
     // Save job overviews to chrome.storage.local
     chrome.storage.local.set({ jobOverviews: jobOverviews }, () => {
-      console.log('Saved job overviews to storage, count:', jobOverviews.length);
+      // Inject match percentages into the table
+      injectMatchPercentagesIntoTable(jobOverviews);
       
-      // Make sure the job overviews are always re-injected after they are recalculated
-      // This ensures match percentages are shown for all visible jobs
-      try {
-        injectMatchPercentagesIntoTable(jobOverviews);
-      } catch (error) {
-        console.error('Error injecting match percentages after saving overviews:', error);
-      }
+      // Notify that scraping has finished
+      chrome.runtime.sendMessage({ action: 'scrapingFinished' });
     });
   } catch (error: unknown) {
     // Handle error silently
+    
+    // Make sure to notify that scraping has finished even if there was an error
+    chrome.runtime.sendMessage({ action: 'scrapingFinished' });
   }
 }
 
@@ -90,6 +97,7 @@ export async function automaticallyRunScraper(): Promise<void> {
  * @param resumeText The processed resume text
  */
 async function calculateAndSaveJobMatches(jobOverviews: any[], resumeText: string): Promise<void> {
+  console.log('table-processor.ts calculateAndSaveJobMatches');
   try {
     console.log('Starting to calculate job matches', { 
       overviewCount: jobOverviews.length,
@@ -182,6 +190,8 @@ async function calculateAndSaveJobMatches(jobOverviews: any[], resumeText: strin
       console.log('Saved job matches to storage');
       // After calculating and saving matches, inject them into the table
       try {
+        // Remove any existing match percentages before injecting new ones
+        removeMatchPercentagesFromTable();
         injectMatchPercentagesIntoTable(jobOverviews);
       } catch (error) {
         console.error('Error injecting match percentages:', error);
@@ -189,5 +199,6 @@ async function calculateAndSaveJobMatches(jobOverviews: any[], resumeText: strin
     });
   } catch (error) {
     console.error('Error in calculateAndSaveJobMatches:', error);
+    
   }
 }

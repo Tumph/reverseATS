@@ -7,10 +7,11 @@ import {JobOverview } from './types';
  * @returns {Array<string>} - Array of job IDs
  */
 export function scrapeJobIds(): string[] {
+  console.log('scraper.ts scrapeJobIds');
   const jobIds: string[] = [];
   
-  
   // Method 1: Find job IDs from input elements with ID pattern
+  console.log('scraper.ts scrapeJobIds - trying method 1');
   const inputElements = $('input[id^="resultRow_"]');
   
   inputElements.each(function() {
@@ -25,7 +26,7 @@ export function scrapeJobIds(): string[] {
   
   // Method 2: Find job IDs from table cells (as backup)
   if (jobIds.length === 0) {
-    
+    console.log('scraper.ts scrapeJobIds - no job IDs found, trying more direct approach number 2');
     // Determine if match column has been added to get the correct job ID column index
     let jobIdColumnIndex = 0; // Default to first column
     
@@ -62,6 +63,7 @@ export function scrapeJobIds(): string[] {
   
   // Try a more direct approach if still no IDs found - scan all cells for 6-digit numbers
   if (jobIds.length === 0) {
+    console.log('scraper.ts scrapeJobIds - no job IDs found, trying more direct approach number 3');
     // Direct approach - find all TD elements that might contain job IDs
     $('td').each(function() {
       const text = $(this).text().trim();
@@ -82,6 +84,7 @@ export function scrapeJobIds(): string[] {
  * @returns {string|null} - The action token or null if not found
  */
 function extractActionToken(): string | null {
+  console.log('scraper.ts extractActionToken');
   try {
     // Convert all script tag contents to a single string
     const scriptTags = Array.from(document.querySelectorAll('script'));
@@ -106,6 +109,7 @@ function extractActionToken(): string | null {
  * @returns {Promise<string|null>} - HTML content of the job overview or null if failed
  */
 export async function fetchJobOverview(jobId: string, actionToken: string): Promise<string | null> {
+  console.log('scraper.ts fetchJobOverview');
   try {
     const url = 'https://waterlooworks.uwaterloo.ca/myAccount/co-op/direct/jobs.htm';
     const payload = `action=${encodeURIComponent(actionToken)}&postingId=${jobId}`;
@@ -137,6 +141,7 @@ export async function fetchJobOverview(jobId: string, actionToken: string): Prom
  * @returns {object} - Object containing job title and full text content
  */
 export function parseJobOverview(html: string): Record<string, string> {
+  console.log('scraper.ts parseJobOverview');
   try {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
@@ -185,6 +190,7 @@ export function parseJobOverview(html: string): Record<string, string> {
 export async function fetchAllJobOverviews(
   progressCallback?: (progress: number, message: string) => void
 ): Promise<JobOverview[]> {
+  console.log('scraper.ts fetchAllJobOverviews');
   try {
     // Function to extract job IDs from current page
     const extractJobIdsFromPage = () => {

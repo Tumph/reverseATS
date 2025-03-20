@@ -8,7 +8,7 @@ import { JobOverview } from './types';
  * @returns void
  */
 export function removeMatchPercentagesFromTable(): void {
-  console.log('table-injector.ts removeMatchPercentagesFromTable');
+
   
   // Find the table containing the job postings
   const table = document.querySelector('table[data-v-17eef081]');
@@ -39,7 +39,6 @@ export function removeMatchPercentagesFromTable(): void {
     }
   });
   
-  console.log('Removed all match percentage elements from table');
 }
 
 /**
@@ -47,22 +46,40 @@ export function removeMatchPercentagesFromTable(): void {
  * @param overviews Array of job overviews with match scores
  */
 export async function injectMatchPercentagesIntoTable(overviews: JobOverview[]): Promise<void> {
-  console.log('table-injector.ts injectMatchPercentagesIntoTable');
-  if (!overviews || overviews.length === 0) return;
+
+  if (!overviews || overviews.length === 0) {
+    console.log('No job overviews available for matching');
+    return;
+  }
+  
+  // Verify we're on a supported page
+  const currentUrl = window.location.href;
+  const isSupportedPage = 
+    currentUrl.includes('waterlooworks.uwaterloo.ca/myAccount/co-op/direct/jobs.htm') ||
+    currentUrl.includes('waterlooworks.uwaterloo.ca/myAccount/co-op/full/jobs.htm') ||
+    currentUrl.includes('waterlooworks.uwaterloo.ca/myAccount/graduating/jobs.htm') ||
+    currentUrl.includes('waterlooworks.uwaterloo.ca/myAccount/contract/jobs.htm');
+  
+  if (!isSupportedPage) {
+    console.log('Not on a supported jobs page, skipping match percentage injection');
+    return;
+  }
+  
+  console.log(`Injecting match percentages for ${overviews.length} job overviews`);
   
   // Find the table containing the job postings
   const table = document.querySelector('table[data-v-17eef081]');
-  if (!table) return;
+  if (!table) {
+    console.log('Job table not found in the DOM');
+    return;
+  }
   
-  // Log start of injection and overview count
-  console.log('Starting to inject match percentages', { overviewCount: overviews.length });
-  
+
   // Create a map of job IDs to match scores
   const matchScores: Record<string, number> = {};
   const jobMatches = await getJobMatches(overviews);
   
-  // Log job matches retrieved
-  console.log('Retrieved job matches', { matchCount: jobMatches.length, sampleMatch: jobMatches[0] });
+  console.log(`Retrieved ${jobMatches.length} job matches from storage`);
   
   // Store match scores in the map
   jobMatches.forEach(match => {
@@ -74,18 +91,43 @@ export async function injectMatchPercentagesIntoTable(overviews: JobOverview[]):
   
   // If match column header doesn't exist, add it
   if (!matchColumnExists) {
+    console.log('Match column header does not exist, adding it');
     // Add match column header to the table header
     const headerRow = table.querySelector('tr.table__row--header');
     if (!headerRow) {
+      console.log('Header row not found');
       return;
     }
     
-    // Add match column header before the ID column (which is the second th)
+    // Find the ID column
+    const headerCells = headerRow.querySelectorAll('th');
+    let idColumnIndex = -1;
+    
+    // Loop through header cells to find the ID column by its text content
+    for (let i = 0; i < headerCells.length; i++) {
+      const cellText = headerCells[i].textContent?.trim() || '';
+      if (cellText.includes('ID')) {
+        idColumnIndex = i;
+        console.log(`Found ID column at index ${idColumnIndex}`);
+        break;
+      }
+    }
+    
+    if (idColumnIndex === -1) {
+      // Default to second column if ID column not found
+      console.log('ID column not found, defaulting to index 1');
+      idColumnIndex = 1;
+    }
+    
+    // Add match column header before the ID column
     const matchHeader = createMatchHeader();
-    const idHeader = headerRow.querySelectorAll('th')[1]; // ID column is the second th
+    const idHeader = headerRow.querySelectorAll('th')[idColumnIndex];
+    
     if (idHeader) {
       headerRow.insertBefore(matchHeader, idHeader);
+      console.log('Match header inserted successfully');
     } else {
+      console.log('ID header element not found');
       return;
     }
     
@@ -95,22 +137,29 @@ export async function injectMatchPercentagesIntoTable(overviews: JobOverview[]):
       const newCol = document.createElement('col');
       newCol.style.width = '125px'; // Set width for the match column
       
-      // Insert before the ID column (second col)
-      const idCol = colgroup.querySelectorAll('col')[1];
+      // Insert before the ID column col
+      const idCol = colgroup.querySelectorAll('col')[idColumnIndex];
       if (idCol) {
         colgroup.insertBefore(newCol, idCol);
+        console.log('Match column added to colgroup');
       } else {
         colgroup.appendChild(newCol);
+        console.log('Match column appended to colgroup (ID col not found)');
       }
     }
     
     // Add CSS for sorting indicators
     addSortingStyles();
+  } else {
+    console.log('Match column header already exists');
   }
   
   // Process all body rows
   const bodyRows = table.querySelectorAll('tr.table__row--body');
-  console.log(`Found ${bodyRows.length} body rows to process`);
+  console.log(`Found ${bodyRows.length} rows to process`);
+  
+  let updatedRowCount = 0;
+  let newCellCount = 0;
   
   bodyRows.forEach((row, index) => {
     // Check if this row already has a match cell
@@ -126,48 +175,120 @@ export async function injectMatchPercentagesIntoTable(overviews: JobOverview[]):
         const { score, color } = formatSimilarityScore(matchScore);
         
         // Update the span
-        const span = existingMatchCell.querySelector('span');
-        if (span) {
+        const span = existingMatchCell.querySelector('span span');
+        if (span && span instanceof HTMLElement) {
           span.style.color = color;
           span.textContent = score;
+          updatedRowCount++;
         }
-
       }
       return; // Skip further processing for this row
     }
     
     // If we get here, the row doesn't have a match cell, so we need to add one
     
-    // Get all cells in the row to find the job ID
-    const cells = row.querySelectorAll('td');
-    if (!cells || cells.length === 0) return;
-    
-    // Look for a 6-digit number in any cell that could be a job ID
+    // Determine the current page type and find job ID accordingly
+    const isGraduatingJobsPage = window.location.href.includes('graduating/jobs.htm');
     let jobId = '';
-    let idCell = null;
+    let idCellIndex = -1;
     
-    for (let i = 0; i < cells.length; i++) {
-      const cell = cells[i];
-      const text = cell.textContent?.trim() || '';
+    if (isGraduatingJobsPage) {
+      // For graduating jobs page, get job ID from row
+      // Find cell with text that has 6 digits (job ID)
+      const cells = row.querySelectorAll('th, td');
       
-      // Check if this looks like a job ID (6-digit number)
-      if (/^\d{6}$/.test(text)) {
-        jobId = text;
-        idCell = cell;
+      for (let i = 0; i < cells.length; i++) {
+        const cell = cells[i];
+        const text = cell.textContent?.trim() || '';
         
-        break;
+        // Check for job ID (6-digit number)
+        if (/^\d{6}$/.test(text)) {
+          jobId = text;
+          idCellIndex = i;
+          break;
+        }
+        
+        // Also check span elements within the cell
+        const spans = cell.querySelectorAll('span');
+        for (let j = 0; j < spans.length; j++) {
+          const spanText = spans[j].textContent?.trim() || '';
+          if (/^\d{6}$/.test(spanText)) {
+            jobId = spanText;
+            idCellIndex = i;
+            break;
+          }
+        }
+        
+        if (jobId) break;
+      }
+    } else {
+      // For co-op jobs page, get job ID from the cells as before
+      const cells = row.querySelectorAll('td');
+      
+      for (let i = 0; i < cells.length; i++) {
+        const cell = cells[i];
+        const text = cell.textContent?.trim() || '';
+        
+        // Check if this looks like a job ID (6-digit number)
+        if (/^\d{6}$/.test(text)) {
+          jobId = text;
+          idCellIndex = i;
+          break;
+        }
       }
     }
     
-    if (!jobId || !idCell) return;
-
+    if (!jobId || idCellIndex === -1) {
+      // Unable to find job ID for this row
+      if (index < 5) { // Only log for first few rows to avoid spam
+        console.log(`Unable to find job ID for row ${index}`);
+      }
+      return;
+    }
     
     // Create match cell
     const matchCell = createMatchCell(jobId, matchScores[jobId] || 0);
     
-    // Add match cell before the ID cell
-    row.insertBefore(matchCell, idCell);
+    // Find where to insert the match cell
+    const headerRow = table.querySelector('tr.table__row--header');
+    if (!headerRow) return;
+    
+    const headerCells = headerRow.querySelectorAll('th');
+    let idColumnIndex = -1;
+    
+    // Find the ID column in the header
+    for (let i = 0; i < headerCells.length; i++) {
+      const cellText = headerCells[i].textContent?.trim() || '';
+      if (cellText.includes('ID')) {
+        idColumnIndex = i;
+        break;
+      }
+    }
+    
+    if (idColumnIndex === -1) {
+      // Default to second column if ID column not found
+      idColumnIndex = 1;
+    }
+    
+    // Add match cell before the cell at the ID column index
+    const targetCells = row.querySelectorAll('th, td');
+    if (idColumnIndex < targetCells.length) {
+      const targetCell = targetCells[idColumnIndex];
+      row.insertBefore(matchCell, targetCell);
+      newCellCount++;
+    } else {
+      const firstCell = targetCells[0];
+      if (firstCell.nextSibling) {
+        row.insertBefore(matchCell, firstCell.nextSibling);
+        newCellCount++;
+      } else {
+        row.appendChild(matchCell);
+        newCellCount++;
+      }
+    }
   });
+  
+  console.log(`Finished processing rows: ${updatedRowCount} updated, ${newCellCount} new match cells added`);
 }
 
 /**
@@ -175,7 +296,7 @@ export async function injectMatchPercentagesIntoTable(overviews: JobOverview[]):
  * @returns The created header cell element
  */
 function createMatchHeader(): HTMLTableHeaderCellElement {
-  console.log('table-injector.ts createMatchHeader');
+
   // Create the header cell
   const th = document.createElement('th');
   th.className = 'table__heading overflow--hidden';
@@ -259,7 +380,7 @@ function createMatchHeader(): HTMLTableHeaderCellElement {
  * @returns The created match cell element
  */
 function createMatchCell(jobId: string, matchScore: number): HTMLTableCellElement {
-  console.log('table-injector.ts createMatchCell');
+
   // Create the cell
   const td = document.createElement('td');
   td.className = 'table__value overflow--hidden';
@@ -270,14 +391,22 @@ function createMatchCell(jobId: string, matchScore: number): HTMLTableCellElemen
   // Get formatted score and color
   const { score, color } = formatSimilarityScore(matchScore);
   
-  // Create span to display the score
-  const span = document.createElement('span');
-  span.className = 'display--flex';
-  span.style.fontWeight = 'bold';
-  span.style.color = color;
-  span.textContent = score;
+  // Create wrapper span to match site's styling
+  const wrapperSpan = document.createElement('span');
+  wrapperSpan.className = 'display--flex';
   
-  td.appendChild(span);
+  // Create inner span to display the score with color
+  const innerSpan = document.createElement('span');
+  innerSpan.style.fontWeight = 'bold';
+  innerSpan.style.color = color;
+  innerSpan.textContent = score;
+  
+  // Add inner span to wrapper span
+  wrapperSpan.appendChild(innerSpan);
+  
+  // Add wrapper span to cell
+  td.appendChild(wrapperSpan);
+  
   return td;
 }
 
@@ -287,7 +416,7 @@ function createMatchCell(jobId: string, matchScore: number): HTMLTableCellElemen
  * @param direction Sort direction ('asc', 'desc', or 'none')
  */
 function sortTableByMatchPercentage(table: HTMLTableElement | null, direction: 'asc' | 'desc' | 'none'): void {
-  console.log('table-injector.ts sortTableByMatchPercentage');
+
   if (!table || direction === 'none') return;
   
   const tbody = table.querySelector('tbody');
@@ -311,41 +440,12 @@ function sortTableByMatchPercentage(table: HTMLTableElement | null, direction: '
   rows.forEach(row => tbody.appendChild(row));
 }
 
-/**
- * Updates match cells in an existing table
- * @param table The table element
- * @param matchScores Map of job IDs to match scores
- */
-function updateExistingMatchCells(table: Element, matchScores: Record<string, number>): void {
-  console.log('table-injector.ts updateExistingMatchCells');
-  // Find all match cells
-  const matchCells = table.querySelectorAll('td[data-job-id]');
-  
-  matchCells.forEach(cell => {
-    const jobId = cell.getAttribute('data-job-id');
-    if (!jobId || !matchScores[jobId]) return;
-    
-    // Update the cell's content and attributes
-    const matchScore = matchScores[jobId];
-    cell.setAttribute('data-match-score', matchScore.toString());
-    
-    // Get formatted score and color
-    const { score, color } = formatSimilarityScore(matchScore);
-    
-    // Update the span
-    const span = cell.querySelector('span');
-    if (span) {
-      span.style.color = color;
-      span.textContent = score;
-    }
-  });
-}
 
 /**
  * Adds CSS styles for sorting icons
  */
 function addSortingStyles(): void {
-  console.log('table-injector.ts addSortingStyles');
+ 
   const style = document.createElement('style');
   style.textContent = `
     th[data-match-column][data-sort-direction="asc"] .material-icons {
@@ -364,23 +464,16 @@ function addSortingStyles(): void {
  * @returns Promise resolving to array of job matches with scores
  */
 async function getJobMatches(overviews: JobOverview[]): Promise<Array<{jobId: string, score: number}>> {
-  console.log('table-injector.ts getJobMatches');
+
   // Get the processed resume text for matching
   return new Promise((resolve) => {
     chrome.storage.local.get(['jobMatches'], (result) => {
       // If we've already calculated matches, use those
       if (result.jobMatches && Array.isArray(result.jobMatches)) {
-        console.log('Using existing job matches from storage', { 
-          matchCount: result.jobMatches.length,
-          has410854: result.jobMatches.some((m: {jobId: string}) => m.jobId === '410854')
-        });
+
         resolve(result.jobMatches);
         return;
       }
-      
-      // If no matches, return empty array
-      // Actual matching is done in renderJobOverviews before this is called
-      console.log('No existing job matches found in storage');
       resolve([]);
     });
   });

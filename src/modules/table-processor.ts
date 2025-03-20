@@ -15,8 +15,9 @@ import { calculateJobResumeMatch } from './similarity';
  * This function doesn't add any buttons, just runs the scraper
  */
 export async function automaticallyRunScraper(): Promise<void> {
-  console.log('table-processor.ts automaticallyRunScraper');
   try {
+    console.log('table-processor.ts automaticallyRunScraper');
+    
     // Notify that scraping has started
     chrome.runtime.sendMessage({ action: 'scrapingStarted' });
     
@@ -97,14 +98,7 @@ export async function automaticallyRunScraper(): Promise<void> {
  * @param resumeText The processed resume text
  */
 async function calculateAndSaveJobMatches(jobOverviews: any[], resumeText: string): Promise<void> {
-  console.log('table-processor.ts calculateAndSaveJobMatches');
   try {
-    console.log('Starting to calculate job matches', { 
-      overviewCount: jobOverviews.length,
-      has410854: jobOverviews.some(job => job.jobId === '410854'),
-      sampleJobIds: jobOverviews.slice(0, 3).map(job => job.jobId)
-    });
-    
     // Get existing job matches first to avoid recalculating everything
     const existingMatches = await new Promise<Array<{jobId: string, score: number}>>((resolve) => {
       chrome.storage.local.get(['jobMatches'], (result) => {
@@ -122,41 +116,17 @@ async function calculateAndSaveJobMatches(jobOverviews: any[], resumeText: strin
       existingMatchMap[match.jobId] = match.score;
     });
     
-    console.log('Using existing matches:', {
-      existingMatchCount: existingMatches.length,
-      has410854: existingMatches.some(match => match.jobId === '410854')
-    });
-    
     // Only calculate matches for jobs that don't already have a score
     const newJobOverviews = jobOverviews.filter(job => !existingMatchMap[job.jobId]);
-    
-    console.log('New jobs to calculate:', {
-      newJobCount: newJobOverviews.length,
-      has410854: newJobOverviews.some(job => job.jobId === '410854')
-    });
     
     // Process new match scores in parallel
     const newMatchPromises = newJobOverviews.map(async ({ jobId, overview }) => {
       try {
-        // Log processing for job ID 410854
-        if (jobId === '410854') {
-          console.log('Processing job ID 410854', { 
-            hasOverview: !!overview,
-            overviewType: typeof overview,
-            overviewKeys: overview ? Object.keys(overview) : []
-          });
-        }
-        
         // Extract job description text for matching
         const jobDescriptionText = overview['overview'] || '';
         
         // Calculate similarity
         const score = await calculateJobResumeMatch(jobDescriptionText, resumeText);
-        
-        // Log score for job ID 410854
-        if (jobId === '410854') {
-          console.log('Calculated score for job ID 410854', { score });
-        }
         
         return { jobId, score };
       } catch (error) {
@@ -179,15 +149,8 @@ async function calculateAndSaveJobMatches(jobOverviews: any[], resumeText: strin
       }
     });
     
-    console.log('Completed job match calculations', { 
-      matchCount: combinedMatches.length,
-      has410854: combinedMatches.some(match => match.jobId === '410854'),
-      score410854: combinedMatches.find(match => match.jobId === '410854')?.score
-    });
-    
     // Save job matches to chrome.storage.local
     chrome.storage.local.set({ jobMatches: combinedMatches }, () => {
-      console.log('Saved job matches to storage');
       // After calculating and saving matches, inject them into the table
       try {
         // Remove any existing match percentages before injecting new ones
@@ -199,6 +162,5 @@ async function calculateAndSaveJobMatches(jobOverviews: any[], resumeText: strin
     });
   } catch (error) {
     console.error('Error in calculateAndSaveJobMatches:', error);
-    
   }
 }

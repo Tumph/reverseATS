@@ -1,5 +1,3 @@
-
-
 /**
  * Creates a styled container for displaying information
  * @ returns The created container element
@@ -33,34 +31,96 @@ export function createLoadingIndicator(): HTMLDivElement {
   loadingIndicator.style.marginTop = '10px';
   loadingIndicator.style.width = '100%';
   loadingIndicator.style.display = 'none'; // Initially hidden
+  loadingIndicator.style.padding = '12px';
+  loadingIndicator.style.backgroundColor = '#1a1a2e';
+  loadingIndicator.style.borderRadius = '8px';
+  loadingIndicator.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.3)';
+  loadingIndicator.style.border = '1px solid #4d4d6e';
+  
+  // Add logo container
+  const logoContainer = document.createElement('div');
+  logoContainer.style.display = 'flex';
+  logoContainer.style.justifyContent = 'center';
+  logoContainer.style.marginBottom = '10px';
+  
+  // Create SVG logo element
+  const svgLogo = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svgLogo.setAttribute('width', '40');
+  svgLogo.setAttribute('height', '40');
+  svgLogo.setAttribute('viewBox', '0 0 24 24');
+  svgLogo.setAttribute('fill', '#4361ee');
+  svgLogo.style.filter = 'drop-shadow(0 0 3px rgba(67, 97, 238, 0.6))';
+  
+  // Add paths for the logo
+  const path1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path1.setAttribute('d', 'M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z');
+  
+  const path2 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path2.setAttribute('d', 'M7 12h2v5H7v-5zm0-5h2v2H7V7zm4 0h2v2h-2V7zm0 5h2v5h-2v-5zm4-5h2v2h-2V7zm0 5h2v5h-2v-5z');
+  
+  // Append paths to SVG
+  svgLogo.appendChild(path1);
+  svgLogo.appendChild(path2);
+  
+  // Add SVG to logo container
+  logoContainer.appendChild(svgLogo);
+  
+  // Add logo container to loading indicator
+  loadingIndicator.appendChild(logoContainer);
   
   // Create status text
   const statusText = document.createElement('div');
   statusText.className = 'loading-status-text';
   statusText.textContent = 'Loading job overviews...';
-  statusText.style.color = '#666';
-  statusText.style.fontStyle = 'italic';
-  statusText.style.marginBottom = '8px';
+  statusText.style.color = '#e6e6e6';
+  statusText.style.fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
+  statusText.style.fontSize = '14px';
+  statusText.style.fontWeight = '500';
+  statusText.style.letterSpacing = '0.5px';
+  statusText.style.marginBottom = '10px';
   loadingIndicator.appendChild(statusText);
   
   // Create progress container
   const progressContainer = document.createElement('div');
   progressContainer.className = 'progress-container';
   progressContainer.style.width = '100%';
-  progressContainer.style.height = '10px';
-  progressContainer.style.backgroundColor = '#e0e0e0';
-  progressContainer.style.borderRadius = '5px';
+  progressContainer.style.height = '8px';
+  progressContainer.style.backgroundColor = '#16213e';
+  progressContainer.style.borderRadius = '4px';
   progressContainer.style.overflow = 'hidden';
+  progressContainer.style.position = 'relative';
   
   // Create progress bar
   const progressBar = document.createElement('div');
   progressBar.className = 'progress-bar';
   progressBar.style.width = '0%';
   progressBar.style.height = '100%';
-  progressBar.style.backgroundColor = '#fbbc05';
+  progressBar.style.background = 'linear-gradient(90deg, #4361ee, #3a0ca3)';
+  progressBar.style.boxShadow = '0 0 8px rgba(67, 97, 238, 0.6)';
   progressBar.style.transition = 'width 0.8s cubic-bezier(0.4, 0.0, 0.2, 1)';
   progressBar.style.transformOrigin = 'left';
   progressContainer.appendChild(progressBar);
+  
+  // Add a pulsing effect line
+  const pulsingLine = document.createElement('div');
+  pulsingLine.style.position = 'absolute';
+  pulsingLine.style.top = '0';
+  pulsingLine.style.left = '0';
+  pulsingLine.style.width = '5px';
+  pulsingLine.style.height = '100%';
+  pulsingLine.style.background = 'rgba(255, 255, 255, 0.3)';
+  pulsingLine.style.animation = 'pulse 1.5s infinite linear';
+  progressContainer.appendChild(pulsingLine);
+  
+  // Add keyframes animation
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes pulse {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(1000%); }
+    }
+  `;
+  document.head.appendChild(style);
   
   loadingIndicator.appendChild(progressContainer);
   
@@ -68,10 +128,12 @@ export function createLoadingIndicator(): HTMLDivElement {
   const percentageText = document.createElement('div');
   percentageText.className = 'percentage-text';
   percentageText.textContent = '0%';
-  percentageText.style.color = '#666';
-  percentageText.style.fontSize = '12px';
-  percentageText.style.marginTop = '4px';
+  percentageText.style.color = '#7ee8fa';
+  percentageText.style.fontSize = '13px';
+  percentageText.style.fontWeight = 'bold';
+  percentageText.style.marginTop = '6px';
   percentageText.style.textAlign = 'right';
+  percentageText.style.fontFamily = 'monospace';
   loadingIndicator.appendChild(percentageText);
   
   return loadingIndicator;
@@ -84,7 +146,6 @@ export function createLoadingIndicator(): HTMLDivElement {
  * @param statusMessage Optional status message to display
  */
 export function updateLoadingProgress(loadingIndicator: HTMLDivElement, progress: number, statusMessage?: string): void {
-  console.log('dom-utils.ts updateLoadingProgress');
   const progressBar = loadingIndicator.querySelector('.progress-bar') as HTMLDivElement;
   const percentageText = loadingIndicator.querySelector('.percentage-text') as HTMLDivElement;
   const statusText = loadingIndicator.querySelector('.loading-status-text') as HTMLDivElement;

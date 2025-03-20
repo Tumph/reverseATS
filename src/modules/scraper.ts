@@ -1,83 +1,4 @@
-// Import required dependencies
-import $ from 'jquery';
 import {JobOverview } from './types';
-
-/**
- * Scrapes all job IDs from the current page
- * @returns {Array<string>} - Array of job IDs
- */
-export function scrapeJobIds(): string[] {
-  console.log('scraper.ts scrapeJobIds');
-  const jobIds: string[] = [];
-  
-  // Method 1: Find job IDs from input elements with ID pattern
-  console.log('scraper.ts scrapeJobIds - trying method 1');
-  const inputElements = $('input[id^="resultRow_"]');
-  
-  inputElements.each(function() {
-    const idAttr = $(this).attr('id');
-    if (idAttr) {
-      const jobId = idAttr.replace('resultRow_', '');
-      if (jobId && !isNaN(Number(jobId)) && !jobIds.includes(jobId)) {
-        jobIds.push(jobId);
-      }
-    }
-  });
-  
-  // Method 2: Find job IDs from table cells (as backup)
-  if (jobIds.length === 0) {
-    console.log('scraper.ts scrapeJobIds - no job IDs found, trying more direct approach number 2');
-    // Determine if match column has been added to get the correct job ID column index
-    let jobIdColumnIndex = 0; // Default to first column
-    
-    // Check if the match column has been added by looking for our custom attribute
-    const matchColumnExists = document.querySelector('th[data-match-column="true"]') !== null;
-    if (matchColumnExists) {
-      jobIdColumnIndex = 1; // If match column exists, job IDs are in the second column
-    }
-    
-    const tableRows = $('.table__row--body');
-    
-    tableRows.each(function() {
-      // Get the cell at the determined job ID column index
-      const jobIdCell = $(this).find(`td:eq(${jobIdColumnIndex})`);
-      const jobId = jobIdCell.text().trim();
-      
-      if (jobId && !isNaN(Number(jobId)) && !jobIds.includes(jobId)) {
-        jobIds.push(jobId);
-      }
-    });
-    
-    // If still no IDs found, try looking at the next column as a fallback
-    if (jobIds.length === 0 && jobIdColumnIndex === 0) {
-      tableRows.each(function() {
-        const jobIdCell = $(this).find('td:eq(1)');
-        const jobId = jobIdCell.text().trim();
-        
-        if (jobId && !isNaN(Number(jobId)) && !jobIds.includes(jobId)) {
-          jobIds.push(jobId);
-        }
-      });
-    }
-  }
-  
-  // Try a more direct approach if still no IDs found - scan all cells for 6-digit numbers
-  if (jobIds.length === 0) {
-    console.log('scraper.ts scrapeJobIds - no job IDs found, trying more direct approach number 3');
-    // Direct approach - find all TD elements that might contain job IDs
-    $('td').each(function() {
-      const text = $(this).text().trim();
-      // Only consider 6-digit numbers as potential job IDs
-      if (/^\d{6}$/.test(text)) {
-        if (!jobIds.includes(text)) {
-          jobIds.push(text);
-        }
-      }
-    });
-  }
-  
-  return jobIds;
-}
 
 /**
  * Extracts the action token for getPostingOverview from the page's script tags
@@ -92,6 +13,7 @@ function extractActionToken(): string | null {
     
     // Extract the action token from the getPostingOverview function
     const match = scriptText.match(/getPostingOverview[^}]*action:\s*'([^\']+)'/);
+    
     if (match && match[1]) {
       return match[1];
     }
@@ -111,10 +33,27 @@ function extractActionToken(): string | null {
 export async function fetchJobOverview(jobId: string, actionToken: string): Promise<string | null> {
   console.log('scraper.ts fetchJobOverview');
   try {
-    const url = 'https://waterlooworks.uwaterloo.ca/myAccount/co-op/direct/jobs.htm';
+    // Get the current page URL to determine which endpoint to use
+    const currentUrl = window.location.href;
+
+    // Check if the current URL is one of the allowed job pages
+    const allowedUrls = [
+      '/myAccount/co-op/full/jobs.htm',
+      '/myAccount/co-op/direct/jobs.htm',
+      '/myAccount/graduating/jobs.htm',
+      '/myAccount/contract/jobs.htm'
+    ];
+    
+    const isAllowedUrl = allowedUrls.some(url => currentUrl.includes(url));
+    
+    if (!isAllowedUrl) {
+      console.warn('Not on an allowed job page, skipping fetch');
+      return null;
+    }
+    
     const payload = `action=${encodeURIComponent(actionToken)}&postingId=${jobId}`;
     
-    const response = await fetch(url, {
+    const response = await fetch(currentUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -141,7 +80,6 @@ export async function fetchJobOverview(jobId: string, actionToken: string): Prom
  * @returns {object} - Object containing job title and full text content
  */
 export function parseJobOverview(html: string): Record<string, string> {
-  console.log('scraper.ts parseJobOverview');
   try {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
@@ -194,72 +132,85 @@ export async function fetchAllJobOverviews(
   try {
     // Function to extract job IDs from current page
     const extractJobIdsFromPage = () => {
-      const jobTable = document.querySelector('table[data-v-17eef081]');
-      
-      if (!jobTable) {
+      // Get the job table
+      const table = document.querySelector('table[data-v-17eef081]');
+      if (!table) {
         console.error('Job table not found');
         return [];
       }
       
+      // Find all rows in the table
+      const rows = table.querySelectorAll('tr');
       const jobIds: string[] = [];
       
-      // Get pagination info to understand context
-      const paginationDiv = document.querySelector('div.table--view__pagination--data[data-v-17eef081]');
-      const resultsCountElement = paginationDiv?.querySelector('div.margin--r--s');
-      const resultsCount = resultsCountElement ? resultsCountElement.textContent?.trim() || '' : '';
-      
-      console.log('Current pagination info:', { 
-        resultsCount,
-        paginationFound: !!paginationDiv 
-      });
-      
-      // Find all rows in the job table
-      const rows = jobTable.querySelectorAll('tr.table__row--body');
-      console.log(`Found ${rows.length} rows in the table`);
-      
-      // Examine each row to find job IDs
+      // Process each row to extract the job ID
       rows.forEach((row, index) => {
         try {
-          // Get all cells in the row
-          const cells = row.querySelectorAll('td');
-          
-          // Log a sample of rows for debugging
-          if (index < 3 || index > rows.length - 3) {
-            console.log(`Row ${index} has ${cells.length} cells`);
+          // Skip header row
+          if (row.classList.contains('table__row--header')) {
+            return;
           }
           
-          // Skip rows with no cells
-          if (!cells || cells.length === 0) return;
+          // Get all cells in the row (including th and td elements)
+          const cells = row.querySelectorAll('td, th');
           
-          // IMPROVED: Find job ID by examining all cells for 6-digit numbers
-          // This is more reliable than assuming a specific column index
+          // First approach: directly check all cell text content for IDs (simplest case)
+          let idFound = false;
           for (let i = 0; i < cells.length; i++) {
             const cell = cells[i];
             const text = cell.textContent?.trim() || '';
             
-            // Check if this looks like a job ID (6-digit number)
-            if (/^\d{6}$/.test(text)) {
+            // Try to extract job ID from cell text (typically digits, allow 5-7 digits to be flexible)
+            if (/^\d{5,7}$/.test(text)) {
               if (!jobIds.includes(text)) {
                 jobIds.push(text);
-                // If this is one of the debug rows, log which cell contained the job ID
-                if (index < 3 || index > rows.length - 3) {
-                  console.log(`Found job ID ${text} in cell ${i} of row ${index}`);
-                }
-                // We found a job ID in this row, so move to the next row
+                idFound = true;
                 break;
               }
             }
           }
+          
+          // Second approach: Search through all span elements in the row if we didn't find an ID directly
+          if (!idFound) {
+            // Get all spans in this row
+            const spans = row.querySelectorAll('span');
+            
+            // Check each span for job ID
+            for (const span of Array.from(spans)) {
+              const text = span.textContent?.trim() || '';
+              
+              // Check for digit-only text that could be a job ID (5-7 digits)
+              if (/^\d{5,7}$/.test(text)) {
+                if (!jobIds.includes(text)) {
+                  jobIds.push(text);
+                  idFound = true;
+                  break;
+                }
+              }
+            }
+          }
+          
+          // Third approach: Look for any elements with numeric-only text
+          if (!idFound) {
+            // Create a TreeWalker to find all text nodes in this row
+            const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
+            let node;
+            while (node = walker.nextNode()) {
+              const text = node.textContent?.trim() || '';
+              // Check for digit-only text that could be a job ID (5-7 digits)
+              if (/^\d{5,7}$/.test(text)) {
+                if (!jobIds.includes(text)) {
+                  jobIds.push(text);
+                  idFound = true;
+                  break;
+                }
+              }
+            }
+          }
+          
         } catch (error) {
           console.error('Error extracting job ID from row:', error);
         }
-      });
-      
-      console.log('Extracted job IDs:', {
-        totalIds: jobIds.length,
-        firstFewIds: jobIds.slice(0, 5),
-        lastFewIds: jobIds.slice(-5),
-        has410854: jobIds.includes('410854')
       });
       
       return jobIds;
@@ -296,7 +247,7 @@ export async function fetchAllJobOverviews(
     // Process jobs in batches to avoid overwhelming the server
     const results: JobOverview[] = [];
     let completedJobs = 0;
-    const parallelBatchSize = 12; // Process 12 requests in parallel (increased from 8)
+    const parallelBatchSize = 20; // Process 20 requests in parallel (increased from 12)
     
     // Function to get a progress value from 0-100 based on completed jobs
     const getProgressValue = (complete: number, total: number, fakeIncrement = 0) => {

@@ -19,7 +19,6 @@ chrome.runtime.onMessage.addListener((message) => {
 
 // Check if resume exists in storage
 chrome.storage.local.get(['resumeText', 'jobOverviews', 'jobMatches'], (result) => {
-  console.log('content.ts chrome.storage.local.get');
   if (!result.resumeText) {
     // If no resume, send message to open popup
     chrome.runtime.sendMessage({ action: 'openPopup' });
@@ -30,7 +29,7 @@ chrome.storage.local.get(['resumeText', 'jobOverviews', 'jobMatches'], (result) 
     // Wait for table to be ready before injecting
     setTimeout(() => {
       injectMatchPercentagesIntoTable(result.jobOverviews);
-    }, 1500);
+    }, 1000);
   }
 });
 
@@ -57,20 +56,18 @@ function isScrapingActive(): boolean {
 function checkForPaginationAndTriggerScrape() {
   // Don't trigger if already triggered or if scraping is active
   if (initialScrapeTriggered || isScrapingActive()) {
-    console.log('Skipping initial scrape - already triggered or scraping in progress');
     return;
   }
   
   const paginationElement = document.querySelector('div.table--view__pagination--data[data-v-17eef081]');
+  
   if (paginationElement) {
-    console.log('Pagination element found, scheduling initial scrape');
     initialScrapeTriggered = true; // Mark as triggered
     
     // Wait 2 seconds before triggering the scrape
     setTimeout(() => {
       // Double-check before actually triggering
       if (!isScrapingActive()) {
-        console.log('Triggering initial automatic scrape');
         // Set flag before calling the function
         isScrapingInProgress = true;
         // Create a wrapper function that will set the flag to false when done
@@ -84,18 +81,20 @@ function checkForPaginationAndTriggerScrape() {
         };
         runScraperWithTracking();
       } else {
-        console.log('Cancelled initial scrape - detected scraping already in progress');
+        
         initialScrapeTriggered = false; // Reset so we can try again later
       }
-    }, 2000);
+    }, 1000);
   }
 }
 
 // Function to check URL and table conditions
 function checkConditionsAndSetupPaginationObserver() {
-  console.log('content.ts checkConditionsAndSetupPaginationObserver');
-  // Check if URL matches
-  const isCorrectURL = window.location.href.includes('https://waterlooworks.uwaterloo.ca/myAccount/co-op/direct/jobs.htm');
+  // Check if URL matches any of the supported pages
+  const isCorrectURL = window.location.href.includes('https://waterlooworks.uwaterloo.ca/myAccount/co-op/direct/jobs.htm') ||
+                     window.location.href.includes('https://waterlooworks.uwaterloo.ca/myAccount/co-op/full/jobs.htm') ||
+                     window.location.href.includes('https://waterlooworks.uwaterloo.ca/myAccount/graduating/jobs.htm') ||
+                     window.location.href.includes('https://waterlooworks.uwaterloo.ca/myAccount/contract/jobs.htm');
 
   // Check if table with specific attribute exists
   const targetTable = document.querySelector('table[data-v-17eef081]');
@@ -119,7 +118,7 @@ if (document.readyState === 'loading') {
 } else {
   setTimeout(() => {
     checkConditionsAndSetupPaginationObserver();
-  }, 1000); // Delay to ensure page is fully loaded
+  }, 500); // Delay to ensure page is fully loaded
 }
 
 // Create a mutation observer to watch for the target table being added to the DOM
@@ -149,4 +148,4 @@ setTimeout(() => {
     childList: true,
     subtree: true
   });
-}, 2000); 
+}, 1000); 

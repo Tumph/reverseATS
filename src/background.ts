@@ -2,8 +2,7 @@
 
 // Listen for messages from content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('background.ts onMessage');
-  // Handle message to open popup
+    // Handle message to open popup
   if (message.action === 'openPopup') {
     chrome.action.openPopup();
   }
@@ -17,7 +16,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 ////
 // Check for first install or update
 chrome.runtime.onInstalled.addListener((details) => {
-  console.log('background.ts onInstalled');
   if (details.reason === 'install') {
     // Show a welcome page or open the popup for first-time users
     chrome.tabs.create({ url: 'popup.html' });
@@ -26,7 +24,6 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 // Listen for extension activation
 chrome.action.onClicked.addListener(() => {
-  console.log('background.ts onClicked');
   // Check if resume exists in storage
   chrome.storage.local.get(['resumeText'], (result) => {
     if (!result.resumeText) {

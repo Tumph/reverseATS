@@ -9,7 +9,6 @@ import { JobOverview } from './types';
  */
 export function removeMatchPercentagesFromTable(): void {
 
-  
   // Find the table containing the job postings
   const table = document.querySelector('table[data-v-17eef081]');
   if (!table) return;
@@ -187,53 +186,63 @@ export async function injectMatchPercentagesIntoTable(overviews: JobOverview[]):
     
     // If we get here, the row doesn't have a match cell, so we need to add one
     
-    // Determine the current page type and find job ID accordingly
-    const isGraduatingJobsPage = window.location.href.includes('graduating/jobs.htm');
+    // Determine the current page type to use appropriate job ID extraction logic
+    const currentUrl = window.location.href;
+    const isGraduatingJobsPage = currentUrl.includes('graduating/jobs.htm');
+    const isFullCyclePage = currentUrl.includes('full/jobs.htm');
+    const isContractPage = currentUrl.includes('contract/jobs.htm');
+    const isDirectPage = currentUrl.includes('direct/jobs.htm');
+    
     let jobId = '';
     let idCellIndex = -1;
     
-    if (isGraduatingJobsPage) {
-      // For graduating jobs page, get job ID from row
-      // Find cell with text that has 6 digits (job ID)
-      const cells = row.querySelectorAll('th, td');
+    // First, try to find job ID in any cell with a 6-digit number
+    const allCells = row.querySelectorAll('th, td');
+    for (let i = 0; i < allCells.length; i++) {
+      const cell = allCells[i];
+      const text = cell.textContent?.trim() || '';
       
-      for (let i = 0; i < cells.length; i++) {
-        const cell = cells[i];
-        const text = cell.textContent?.trim() || '';
-        
-        // Check for job ID (6-digit number)
-        if (/^\d{6}$/.test(text)) {
-          jobId = text;
-          idCellIndex = i;
-          break;
-        }
-        
-        // Also check span elements within the cell
-        const spans = cell.querySelectorAll('span');
-        for (let j = 0; j < spans.length; j++) {
-          const spanText = spans[j].textContent?.trim() || '';
-          if (/^\d{6}$/.test(spanText)) {
-            jobId = spanText;
-            idCellIndex = i;
-            break;
-          }
-        }
-        
-        if (jobId) break;
+      // Check for job ID (6-digit number)
+      if (/^\d{6}$/.test(text)) {
+        jobId = text;
+        idCellIndex = i;
+        break;
       }
-    } else {
-      // For co-op jobs page, get job ID from the cells as before
-      const cells = row.querySelectorAll('td');
       
-      for (let i = 0; i < cells.length; i++) {
-        const cell = cells[i];
-        const text = cell.textContent?.trim() || '';
-        
-        // Check if this looks like a job ID (6-digit number)
-        if (/^\d{6}$/.test(text)) {
-          jobId = text;
+      // Also check span elements within the cell
+      const spans = cell.querySelectorAll('span');
+      for (let j = 0; j < spans.length; j++) {
+        const spanText = spans[j].textContent?.trim() || '';
+        if (/^\d{6}$/.test(spanText)) {
+          jobId = spanText;
           idCellIndex = i;
           break;
+        }
+      }
+      
+      if (jobId) break;
+    }
+    
+    // If not found yet, try to find job ID in checkbox input value
+    if (!jobId) {
+      const checkbox = row.querySelector('input[type="checkbox"][name="dataViewerSelection"]');
+      if (checkbox && checkbox instanceof HTMLInputElement && checkbox.value) {
+        const checkboxValue = checkbox.value.trim();
+        if (/^\d{6}$/.test(checkboxValue)) {
+          jobId = checkboxValue;
+          
+          // Find the ID column by looking at the header
+          const headerRow = table.querySelector('tr.table__row--header');
+          if (headerRow) {
+            const headerCells = headerRow.querySelectorAll('th');
+            for (let i = 0; i < headerCells.length; i++) {
+              const cellText = headerCells[i].textContent?.trim() || '';
+              if (cellText.includes('ID')) {
+                idCellIndex = i;
+                break;
+              }
+            }
+          }
         }
       }
     }
@@ -254,32 +263,40 @@ export async function injectMatchPercentagesIntoTable(overviews: JobOverview[]):
     if (!headerRow) return;
     
     const headerCells = headerRow.querySelectorAll('th');
-    let idColumnIndex = -1;
+    let matchColumnIndex = -1;
     
-    // Find the ID column in the header
+    // Find the match column in the header
     for (let i = 0; i < headerCells.length; i++) {
-      const cellText = headerCells[i].textContent?.trim() || '';
-      if (cellText.includes('ID')) {
-        idColumnIndex = i;
+      if (headerCells[i].hasAttribute('data-match-column')) {
+        matchColumnIndex = i;
         break;
       }
     }
     
-    if (idColumnIndex === -1) {
-      // Default to second column if ID column not found
-      idColumnIndex = 1;
-    }
-    
-    // Add match cell before the cell at the ID column index
-    const targetCells = row.querySelectorAll('th, td');
-    if (idColumnIndex < targetCells.length) {
-      const targetCell = targetCells[idColumnIndex];
-      row.insertBefore(matchCell, targetCell);
-      newCellCount++;
+    if (matchColumnIndex === -1) {
+      // Fallback to the old behavior if match column not found
+      const idColumnIndex = findIdColumnIndex(headerCells);
+      const targetCells = row.querySelectorAll('th, td');
+      if (idColumnIndex < targetCells.length) {
+        const targetCell = targetCells[idColumnIndex];
+        row.insertBefore(matchCell, targetCell);
+        newCellCount++;
+      } else {
+        const firstCell = targetCells[0];
+        if (firstCell.nextSibling) {
+          row.insertBefore(matchCell, firstCell.nextSibling);
+          newCellCount++;
+        } else {
+          row.appendChild(matchCell);
+          newCellCount++;
+        }
+      }
     } else {
-      const firstCell = targetCells[0];
-      if (firstCell.nextSibling) {
-        row.insertBefore(matchCell, firstCell.nextSibling);
+      // Insert at exactly the same index as the match header
+      const targetCells = row.querySelectorAll('th, td');
+      if (matchColumnIndex < targetCells.length) {
+        const targetCell = targetCells[matchColumnIndex];
+        row.insertBefore(matchCell, targetCell);
         newCellCount++;
       } else {
         row.appendChild(matchCell);
@@ -477,4 +494,19 @@ async function getJobMatches(overviews: JobOverview[]): Promise<Array<{jobId: st
       resolve([]);
     });
   });
+}
+
+/**
+ * Helper function to find the ID column index
+ * @param headerCells The header cells collection
+ * @returns The index of the ID column, or 1 if not found
+ */
+function findIdColumnIndex(headerCells: NodeListOf<HTMLTableHeaderCellElement>): number {
+  for (let i = 0; i < headerCells.length; i++) {
+    const cellText = headerCells[i].textContent?.trim() || '';
+    if (cellText.includes('ID')) {
+      return i;
+    }
+  }
+  return 1; // Default to second column if ID column not found
 } 

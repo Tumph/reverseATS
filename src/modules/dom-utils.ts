@@ -22,7 +22,7 @@ export function createStyledContainer(): HTMLDivElement {
 
 /**
  * Creates a loading indicator element with progress bar
- * @returns The created loading indicator element
+ * @ returns The created loading indicator element
  */
 export function createLoadingIndicator(): HTMLDivElement {
   console.log('dom-utils.ts createLoadingIndicator');

@@ -30,6 +30,7 @@
     "canvas": "^3.1.0",
     "compromise": "^14.14.4",
     "jquery": "^3.7.1",
-    "node-nlp": "^5.0.0-alpha.5"
+    "node-nlp": "^5.0.0-alpha.5",
+    "pdfjs-dist": "^5.0.375"
   }
 }

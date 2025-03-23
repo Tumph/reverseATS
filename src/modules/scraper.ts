@@ -135,7 +135,6 @@ export async function fetchAllJobOverviews(
       // Get the job table
       const table = document.querySelector('table[data-v-17eef081]');
       if (!table) {
-        console.error('Job table not found');
         return [];
       }
       

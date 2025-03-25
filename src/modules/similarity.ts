@@ -48,14 +48,18 @@ const STOPWORDS = new Set([
  */
 const JOB_DOMAINS: Record<string, string[]> = {
   'technology': ['software', 'developer', 'engineer', 'programming', 'code', 'web', 'app', 'development', 'database', 'frontend', 'backend', 'fullstack'],
-  'finance': ['finance', 'accounting', 'audit', 'banking', 'financial', 'investment', 'tax', 'budget', 'revenue', 'assets'],
-  'healthcare': ['health', 'medical', 'clinical', 'patient', 'doctor', 'nurse', 'care', 'hospital', 'healthcare', 'therapy'],
-  'marketing': ['marketing', 'brand', 'social media', 'seo', 'content', 'advertising', 'market', 'campaign', 'digital marketing'],
-  'education': ['education', 'teaching', 'teacher', 'student', 'school', 'university', 'academic', 'professor', 'instructor', 'curriculum'],
-  'legal': ['legal', 'law', 'attorney', 'lawyer', 'litigation', 'compliance', 'contract', 'paralegal', 'regulation'],
-  'engineering': ['engineering', 'mechanical', 'electrical', 'civil', 'design', 'construction', 'manufacturing', 'product', 'industrial'],
-  'retail': ['retail', 'sales', 'customer', 'store', 'product', 'inventory', 'merchandising', 'consumer', 'ecommerce'],
-  'hr': ['human resources', 'hr', 'recruiting', 'talent', 'hiring', 'employee', 'benefits', 'compensation', 'workforce']
+  'finance': ['finance', 'accounting', 'audit', 'banking', 'financial', 'investment', 'tax', 'budget', 'revenue', 'assets', 'portfolio', 'trading', 'risk', 'equity', 'valuation'],
+  'healthcare': ['health', 'medical', 'clinical', 'patient', 'doctor', 'nurse', 'care', 'hospital', 'healthcare', 'therapy', 'wellness', 'treatment', 'rehabilitation', 'diagnostic', 'pharmaceutical'],
+  'marketing': ['marketing', 'brand', 'social media', 'seo', 'content', 'advertising', 'market', 'campaign', 'digital marketing', 'communications', 'public relations', 'creative', 'strategy', 'branding', 'engagement'],
+  'education': ['education', 'teaching', 'teacher', 'student', 'school', 'university', 'academic', 'professor', 'instructor', 'curriculum', 'learning', 'training', 'development', 'mentoring', 'coaching'],
+  'legal': ['legal', 'law', 'attorney', 'lawyer', 'litigation', 'compliance', 'contract', 'paralegal', 'regulation', 'policy', 'governance', 'rights', 'legislation', 'counsel'],
+  'engineering': ['engineering', 'mechanical', 'electrical', 'civil', 'design', 'construction', 'manufacturing', 'product', 'industrial', 'systems', 'process', 'quality', 'safety', 'technical'],
+  'retail': ['retail', 'sales', 'customer', 'store', 'product', 'inventory', 'merchandising', 'consumer', 'ecommerce', 'operations', 'service', 'business', 'client', 'account'],
+  'hr': ['human resources', 'hr', 'recruiting', 'talent', 'hiring', 'employee', 'benefits', 'compensation', 'workforce', 'development', 'training', 'culture', 'engagement', 'diversity'],
+  'operations': ['operations', 'logistics', 'supply chain', 'procurement', 'inventory', 'warehouse', 'distribution', 'planning', 'process', 'quality', 'management', 'efficiency'],
+  'research': ['research', 'analysis', 'data', 'insights', 'study', 'investigation', 'methodology', 'evaluation', 'assessment', 'findings', 'development'],
+  'design': ['design', 'creative', 'user experience', 'visual', 'graphic', 'product', 'interface', 'brand', 'art', 'media', 'content', 'production'],
+  'consulting': ['consulting', 'strategy', 'advisory', 'business', 'solutions', 'client', 'stakeholder', 'management', 'transformation', 'innovation']
 };
 
 /**
@@ -63,48 +67,121 @@ const JOB_DOMAINS: Record<string, string[]> = {
  */
 const DOMAIN_WEIGHTS: Record<string, Record<string, number>> = {
   'technology': {
-    'javascript': 2.5, 'typescript': 2.5, 'python': 2.5, 'java': 2.5, 'c++': 2.5,
-    'react': 2.2, 'node': 2.2, 'angular': 2.2, 'vue': 2.2, 'html': 1.8, 'css': 1.8,
-    'database': 2.0, 'aws': 2.0, 'cloud': 2.0, 'api': 2.0, 'web': 1.8,
-    'algorithm': 1.5, 'data structure': 1.5, 'software': 1.5, 'architecture': 1.5,
-    'agile': 1.3, 'scrum': 1.3, 'testing': 1.3, 'git': 1.3, 'ci/cd': 1.5
+    // Software Development (High-level languages) - Highest weights for most commonly used
+    'python': 3.0, 'javascript': 3.0, 'typescript': 3.0, 'java': 3.0, 'c#': 3.0,
+    'c++': 3.0, 'c': 3.0, 'go': 3.0, 'golang': 3.0, 'ruby': 3.0,
+    'php': 3.0, 'swift': 3.0, 'kotlin': 3.0, 'rust': 3.0, 'r': 3.0,
+    'sql': 3.0, 'dart': 3.0, 'scala': 3.0, 'lua': 3.0, 'shell': 3.0,
+    'bash': 3.0, 'powershell': 3.0, 'matlab': 3.0,
+    
+    // Hardware/Low-level Development
+    'vhdl': 3.0, 'verilog': 3.0, 'cuda': 3.0, 'opencl': 3.0,
+    'assembly': 3.0, 'asm': 3.0, 'systemverilog': 3.0, 'ada': 3.0,
+    'fortran': 3.0, 'objective-c': 3.0, 'zig': 3.0,
+    
+    // Special Purpose Languages
+    'webassembly': 3.0, 'wasm': 3.0, 'f#': 3.0, 'fsharp': 3.0,
+    'risc-v': 3.0, 'riscv': 3.0,
+    
+    // Frameworks and Technologies - High weights for popular frameworks
+    'react': 2.8, 'node': 2.8, 'angular': 2.8, 'vue': 2.8,
+    'django': 2.8, 'flask': 2.8, 'spring': 2.8, 'rails': 2.8,
+    'unity': 2.8, 'flutter': 2.8, '.net': 2.8, 'dotnet': 2.8,
+    'laravel': 2.8, 'express': 2.8, 'next.js': 2.8, 'nuxt': 2.8,
+    
+    // Web Technologies
+    'html': 2.8, 'css': 2.8, 'sass': 2.8, 'less': 2.8,
+    'graphql': 2.8, 'rest': 2.8, 'websocket': 2.8,
+    
+    // Cloud and Infrastructure
+    'aws': 2.8, 'azure': 2.8, 'gcp': 2.8, 'docker': 2.8,
+    'kubernetes': 2.8, 'terraform': 2.8, 'jenkins': 2.8,
+    'gitlab': 2.8, 'github': 2.8, 'bitbucket': 2.8,
+    
+    // Databases
+    'mysql': 2.8, 'postgresql': 2.8, 'mongodb': 2.8, 'redis': 2.8,
+    'elasticsearch': 2.8, 'cassandra': 2.8, 'oracle': 2.8,
+    'database': 2.8, 'nosql': 2.8, 'sql server': 2.8,
+    
+    // Development Concepts and Tools
+    'api': 2.8, 'web': 2.8, 'mobile': 2.8, 'cloud': 2.8,
+    'frontend': 2.8, 'backend': 2.8, 'fullstack': 2.8,
+    'devops': 2.8, 'ci/cd': 2.8, 'microservices': 2.8,
+    'architecture': 2.8, 'design patterns': 2.8,
+    
+    // Version Control and Development Tools
+    'git': 2.5, 'svn': 2.5, 'mercurial': 2.5,
+    'vscode': 2.5, 'intellij': 2.5, 'eclipse': 2.5,
+    
+    // Development Practices
+    'agile': 2.0, 'scrum': 2.0, 'kanban': 2.0,
+    'tdd': 2.0, 'bdd': 2.0, 'testing': 2.0,
+    'code review': 2.0, 'pair programming': 2.0,
+    
+    // Software Engineering Concepts
+    'algorithm': 2.0, 'data structure': 2.0, 'software': 2.0,
+    'object oriented': 2.0, 'functional programming': 2.0,
+    'concurrent': 2.0, 'parallel': 2.0, 'distributed': 2.0
   },
   'finance': {
-    'accounting': 2.5, 'finance': 2.5, 'audit': 2.5, 'financial': 2.5, 'tax': 2.5,
-    'investment': 2.2, 'banking': 2.2, 'budget': 2.2, 'revenue': 2.2,
-    'analysis': 2.0, 'forecast': 2.0, 'portfolio': 2.0, 'compliance': 2.0,
-    'excel': 1.8, 'financial modeling': 1.8, 'gaap': 1.8, 'cpa': 2.0,
-    'risk': 1.5, 'balance sheet': 1.5, 'cash flow': 1.5, 'profit': 1.5
+    // Financial tools and skills with high weights
+    'bloomberg': 3.0, 'factset': 3.0, 'capital iq': 3.0, 'excel': 3.0,
+    'financial modeling': 3.0, 'valuation': 3.0, 'deal management': 3.0,
+    'accounting': 2.8, 'finance': 2.8, 'audit': 2.8, 'financial': 2.8,
+    'investment': 2.5, 'banking': 2.5, 'budget': 2.5, 'revenue': 2.5,
+    'analysis': 2.3, 'forecast': 2.3, 'portfolio': 2.3, 'compliance': 2.3
   },
   'healthcare': {
-    'nurse': 2.5, 'doctor': 2.5, 'patient': 2.5, 'hospital': 2.5, 'healthcare': 2.5,
-    'therapy': 2.2, 'pharmacy': 2.2, 'nursing': 2.2, 'medical': 2.0,
-    'surgery': 1.8, 'diagnosis': 1.8, 'treatment': 1.8, 'medicine': 1.8
+    'nurse': 2.8, 'doctor': 2.8, 'patient': 2.8, 'hospital': 2.8, 'healthcare': 2.8,
+    'therapy': 2.5, 'pharmacy': 2.5, 'nursing': 2.5, 'medical': 2.5,
+    'surgery': 2.3, 'diagnosis': 2.3, 'treatment': 2.3, 'medicine': 2.3,
+    'clinical': 2.5, 'care': 2.5, 'health': 2.5, 'wellness': 2.3,
+    'rehabilitation': 2.3, 'diagnostic': 2.3, 'pharmaceutical': 2.3
   },
   'marketing': {
-    'social media': 2.5, 'seo': 2.5, 'content': 2.5, 'advertising': 2.5, 'brand': 2.5,  
-    'marketing': 2.2, 'campaign': 2.2, 'digital marketing': 2.2,
-    'email marketing': 1.8, 'marketing automation': 1.8, 'analytics': 1.8
+    // Marketing tools and platforms with high weights
+    'hubspot': 3.0, 'salesforce': 3.0, 'marketo': 3.0, 'mailchimp': 3.0,
+    'google analytics': 3.0, 'google ads': 3.0, 'facebook ads': 3.0,
+    'social media management': 2.8, 'content management': 2.8, 'seo': 2.8,
+    'marketing automation': 2.8, 'email marketing': 2.8, 'crm': 2.8,
+    'marketing': 2.5, 'brand': 2.5, 'social media': 2.5, 'content': 2.5,
+    'campaign': 2.3, 'digital marketing': 2.3, 'communications': 2.3,
+    'creative': 2.0, 'strategy': 2.0, 'branding': 2.0, 'engagement': 2.0
   },
   'education': {
-    'teaching': 2.5, 'student': 2.5, 'school': 2.5, 'university': 2.5, 'academic': 2.5,
-    'education': 2.2, 'curriculum': 2.2, 'instructor': 2.0, 'research': 1.8
+    'teaching': 2.8, 'education': 2.8, 'student': 2.8, 'learning': 2.8, 'curriculum': 2.8,
+    'instructor': 2.5, 'professor': 2.5, 'academic': 2.5, 'school': 2.5,
+    'training': 2.3, 'development': 2.3, 'mentoring': 2.3, 'coaching': 2.3,
+    'assessment': 2.3, 'instruction': 2.3, 'classroom': 2.3, 'pedagogy': 2.5
   },
-  'legal': {
-    'law': 2.5, 'attorney': 2.5, 'litigation': 2.5, 'contract': 2.5, 'paralegal': 2.5,
-    'regulation': 2.2, 'compliance': 2.2, 'legal': 2.0
+  'operations': {
+    // Operations tools and skills with high weights
+    'sap': 3.0, 'oracle': 3.0, 'quickbooks': 3.0, 'netsuite': 3.0,
+    'jira': 3.0, 'trello': 3.0, 'asana': 3.0, 'monday': 3.0,
+    'project management': 2.8, 'process automation': 2.8, 'six sigma': 2.8,
+    'operations': 2.5, 'logistics': 2.5, 'supply chain': 2.5, 'procurement': 2.5,
+    'inventory': 2.3, 'warehouse': 2.3, 'distribution': 2.3, 'planning': 2.3
   },
-  'engineering': {
-    'mechanical': 2.5, 'electrical': 2.5, 'civil': 2.5, 'design': 2.5, 'construction': 2.5,
-    'manufacturing': 2.2, 'product': 2.0, 'industrial': 1.8
+  'research': {
+    'research': 2.8, 'analysis': 2.8, 'study': 2.8, 'methodology': 2.8,
+    'data': 2.5, 'insights': 2.5, 'evaluation': 2.5, 'assessment': 2.5,
+    'investigation': 2.3, 'findings': 2.3, 'development': 2.3,
+    'analytical': 2.3, 'quantitative': 2.3, 'qualitative': 2.3
   },
-  'retail': {
-    'sales': 2.5, 'customer': 2.5, 'store': 2.5, 'inventory': 2.5, 'merchandising': 2.5,
-    'retail': 2.2, 'consumer': 2.0, 'ecommerce': 1.8
+  'design': {
+    // Design tools and skills with high weights
+    'adobe creative suite': 3.0, 'photoshop': 3.0, 'illustrator': 3.0,
+    'indesign': 3.0, 'figma': 3.0, 'sketch': 3.0, 'xd': 3.0,
+    'ui design': 2.8, 'ux design': 2.8, 'graphic design': 2.8,
+    'visual design': 2.8, 'web design': 2.8, 'typography': 2.8,
+    'design': 2.5, 'creative': 2.5, 'user experience': 2.5, 'visual': 2.5,
+    'art': 2.3, 'media': 2.3, 'content': 2.3, 'production': 2.3
   },
-  'hr': {
-    'human resources': 2.5, 'hr': 2.5, 'recruiting': 2.5, 'talent': 2.5, 'hiring': 2.5,
-    'employee': 2.2, 'benefits': 2.0, 'compensation': 1.8
+  'consulting': {
+    'consulting': 2.8, 'strategy': 2.8, 'advisory': 2.8, 'solutions': 2.8,
+    'client': 2.5, 'stakeholder': 2.5, 'management': 2.5, 'transformation': 2.5,
+    'innovation': 2.3, 'business': 2.3, 'analysis': 2.3, 'recommendation': 2.3,
+    'framework': 2.3, 'methodology': 2.3, 'implementation': 2.3
   }
 };
 
@@ -112,28 +189,40 @@ const DOMAIN_WEIGHTS: Record<string, Record<string, number>> = {
  * Important terms that apply across all job domains and their weights
  */
 export const TERM_WEIGHTS: Record<string, number> = {
-  // Generic skills valued in most jobs
-  'management': 1.8, 'leadership': 1.8, 'communication': 1.8, 
-  'problem solving': 1.8, 'teamwork': 1.8, 'analytical': 1.8,
-  'organization': 1.6, 'planning': 1.6, 'time management': 1.6,
-  'project management': 1.6, 'strategic': 1.6, 'innovative': 1.6,
-  'research': 1.5, 'analysis': 1.5, 'reporting': 1.5,
-  'presentation': 1.5, 'coordination': 1.5, 'collaboration': 1.5,
+  // Skills and tools (highest weights)
+  'automation': 3.0, 'system integration': 3.0, 'data analysis': 3.0,
+  'project management': 3.0, 'business intelligence': 3.0,
+  'reporting': 3.0, 'dashboard': 3.0, 'analytics': 3.0, 'visualization': 3.0,
+  'process improvement': 3.0,
+  
+  // Generic professional skills (high weights)
+  'management': 2.8, 'leadership': 2.8, 'communication': 2.8, 
+  'problem solving': 2.8, 'teamwork': 2.8, 'analytical': 2.8,
+  'organization': 2.5, 'planning': 2.5, 'time management': 2.5,
+  'strategic': 2.5, 'innovative': 2.5,
+  
+  // Soft skills and interpersonal abilities
+  'interpersonal': 2.3, 'relationship building': 2.3, 'negotiation': 2.3,
+  'conflict resolution': 2.3, 'mentoring': 2.3, 'coaching': 2.3,
+  'facilitation': 2.0, 'public speaking': 2.0, 'written communication': 2.0,
+  'verbal communication': 2.0, 'customer service': 2.0, 'client relations': 2.0,
+  
+  // Business and professional skills
+  'strategy': 2.3, 'business development': 2.3, 'stakeholder management': 2.3,
+  'change management': 2.3, 'risk management': 2.3,
+  'decision making': 2.0, 'problem analysis': 2.0, 'critical thinking': 2.0,
   
   // Experience levels
-  'senior': 2.0, 'lead': 2.0, 'manager': 2.0, 'director': 2.0,
-  'junior': 1.8, 'entry level': 1.8, 'intern': 1.8, 'associate': 1.8,
-  'experienced': 1.7, 'professional': 1.7, 'specialist': 1.7,
+  'senior': 1.8, 'lead': 1.8, 'manager': 1.8, 'director': 1.8,
+  'junior': 1.5, 'entry level': 1.5, 'intern': 1.5, 'associate': 1.5,
+  'experienced': 1.5, 'professional': 1.5, 'specialist': 1.5,
   
   // Education
-  'bachelor': 1.5, 'master': 1.5, 'phd': 1.5, 'degree': 1.5,
-  'certification': 1.5, 'license': 1.5, 'graduate': 1.5,
+  'bachelor': 1.3, 'master': 1.3, 'phd': 1.3, 'degree': 1.3,
+  'certification': 1.3, 'license': 1.3, 'graduate': 1.3,
   
-  // Common software & tools
-  'microsoft': 1.4, 'office': 1.4, 'excel': 1.4, 'word': 1.4,
-  'powerpoint': 1.4, 'outlook': 1.4, 'software': 1.4,
-  
-  // Plus the domain-specific terms will be added dynamically
+  // Common software & tools (base weights for general tools)
+  'microsoft': 1.5, 'office': 1.5, 'powerpoint': 1.5, 'outlook': 1.5
 };
 
 /**
@@ -654,29 +743,29 @@ export async function calculateJobResumeMatch(jobText: string, resumeText: strin
     let scaledScore: number;
     
     // Scaling function designed to give better distribution:
-    // - Provides a higher baseline (min 15% instead of near 0%)
-    // - More linear scaling in the middle ranges
-    // - Still makes 90%+ difficult to achieve
+    // - Provides a higher baseline (min 20% instead of 15%)
+    // - More generous scaling in the middle ranges for non-technical matches
+    // - Still makes 95%+ difficult to achieve
     if (rawScore <= 0.1) {
-      // Boost very low scores to minimum 15%
-      scaledScore = 15 + (rawScore * 250); // 15-40% range
+      // Boost very low scores to minimum 20%
+      scaledScore = 20 + (rawScore * 300); // 20-50% range
       debugLog('calculateJobResumeMatch', `Low match scaling: ${rawScore} -> ${scaledScore}`);
     } else if (rawScore <= 0.3) {
-      // Medium-low matches to 40-70% range
-      scaledScore = 40 + ((rawScore - 0.1) * 150);
+      // Medium-low matches to 50-75% range
+      scaledScore = 50 + ((rawScore - 0.1) * 125);
       debugLog('calculateJobResumeMatch', `Medium-low match scaling: ${rawScore} -> ${scaledScore}`);
     } else if (rawScore <= 0.5) {
-      // Medium-high matches to 70-85% range
-      scaledScore = 70 + ((rawScore - 0.3) * 75);
+      // Medium-high matches to 75-90% range
+      scaledScore = 75 + ((rawScore - 0.3) * 75);
       debugLog('calculateJobResumeMatch', `Medium-high match scaling: ${rawScore} -> ${scaledScore}`);
     } else {
-      // Top matches to 85-100% range, making 100% very hard to achieve
-      scaledScore = 85 + ((rawScore - 0.5) * 30);
+      // Top matches to 90-100% range, making 100% very hard to achieve
+      scaledScore = 90 + ((rawScore - 0.5) * 20);
       debugLog('calculateJobResumeMatch', `Top match scaling: ${rawScore} -> ${scaledScore}`);
     }
     
     // Ensure score is between 0 and 100%
-    scaledScore = Math.min(Math.max(scaledScore, 15), 100);
+    scaledScore = Math.min(Math.max(scaledScore, 20), 100);
     const finalScore = scaledScore / 100;
     
     debugLog('calculateJobResumeMatch', `Final match results:`, {
